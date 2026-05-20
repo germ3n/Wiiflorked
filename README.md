@@ -32,6 +32,9 @@ Launch WiiFlorked via HBC. The cache builder merges both drives into a unified v
 Don't forget to 'Rebuild Cache' if you already use regular Wiiflow.
 
 
+Forwarder (Priiloader + System Menu): https://github.com/germ3n/wiiflorked_forwarder/releases/latest
+
+
 
 This might break some things in Wiiflow, but launching Wii & Gamecube games from both usb drives works, I'll get around to plugins etc soon
 
