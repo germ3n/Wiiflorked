@@ -1,5 +1,13 @@
 # WiiFlorked: A Fork of WiiFlow Lite with support for 2 external hard drives.
 
+**Current Status:**
+
+* **Working:** Wii and GameCube (via Nintendont) backups from both drives concurrently (tested with two external HDDs, each using a single FAT32 partition).
+* **W.I.P:** Emulators, plugins, and advanced features are currently being tested and patched. Expect a few standard WiiFlow features to act a bit weird while the dual-drive routing is finalized.
+* Only supports a single FAT32 partition per drive, which has to be the first partition
+* So far only tested on my RVL-001 with 4.1E SM
+* Banner extraction doesn't work so every Game will just play the default sound. Workaround for this is currently to extract the banner on a PC via wit. Script you can use to extract the banners: [https://gist.github.com/germ3n/6e4319f49a78b3ba83a1ae6216fe288e](https://gist.github.com/germ3n/6e4319f49a78b3ba83a1ae6216fe288e)
+
 ## Step 1: The Dual-Port cIOS Foundation
 Install the required cIOS banks via the d2x cIOS Installer. [d2x Installers](https://github.com/germ3n/Wiiflorked/raw/refs/heads/master/d2x.zip)<br>
 You can read [this guide](https://wii.hacks.guide/cios) to get understand how to install them
