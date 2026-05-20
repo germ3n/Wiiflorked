@@ -19,7 +19,7 @@ Bank 2 (Port 1 / usb2):
 - Slot 211: Base 58
 
 ## Step 2: Installation
-Simply drag the wiiflorked folder into sdcard:/apps/
+Simply drag the wiiflorked folder into sdcard:/apps/ and wiiflow into sdcard:/
 
 ## Step 3: Drive Layout Configuration
 - Port 0 (usb1): Place accessory-dependent games or those requiring strict timing (e.g., Driver: San Francisco, Rock Band).
