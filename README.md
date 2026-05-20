@@ -25,16 +25,31 @@ Simply drag the wiiflorked folder into sdcard:/apps/
 - Port 0 (usb1): Place accessory-dependent games or those requiring strict timing (e.g., Driver: San Francisco, Rock Band).
 - Port 1 (usb2): Place standard Wii and GameCube backups here.
 
+# Step 4: First Boot & Caching
 
+1. Launch Wiiflorked via the Homebrew Channel.
+2. The cache builder will scan and merge both drives into a single unified view.
+3. Leave your game settings on **AUTO**. The cIOS router dynamically shifts between Bank 1 and Bank 2 on the fly depending on which physical drive the game is sitting on.
 
+*Note: If you are migrating from standard WiiFlow, you must hit 'Reload Cache' on your first boot so the engine registers the new dual-drive layout.*
 
+# Optional: Priiloader Autoboot (Forwarder)
 
-Launch WiiFlorked via HBC. The cache builder merges both drives into a unified view, and the cIOS router dynamically shifts between banks based on physical drive location. Leave game settings on AUTO.
-Don't forget to 'Rebuild Cache' if you already use regular Wiiflow.
-
-
+If you want to autoboot directly into the dual-drive layout on system startup:<br>
 Forwarder (Priiloader + System Menu): https://github.com/germ3n/wiiflorked_forwarder/releases/latest
 
+1. Drop wiiflorked_forwarder into your sdcard:/apps/ folder.
+2. Launch Priiloader
+3. Navigate to Load/Install File
+4. Install "Wiiflorked Forwarder (AHBPROT Available)"
+5. Navigate to Settings
+6. Set Autoboot to Installed File
+
+# Important Power & Hardware Notes:
+
+To avoid system instability, it is highly recommended to use an active (powered) USB hub along with USB Y-cables.
+
+To prevent current backfeed from damaging your Wii's motherboard, you should isolate the power rails. Plug the power legs of your Y-cables directly into the active wall-powered hub, and plug the data legs into the Wii ports using a 5V USB Power Blocker (such as this one: [https://www.amazon.de/-/en/gp/product/B094G4P3P4](https://www.amazon.de/-/en/gp/product/B094G4P3P4)). This ensures your hard drives get clean power from the wall while sending pure data safely to the console.
 
 
 This might break some things in Wiiflow, but launching Wii & Gamecube games from both usb drives works, I'll get around to plugins etc soon
