@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<app version="1">
+    <name>WiiFlorked Forwarder</name>
+    <coder>germ3n</coder>
+    <version>1.0</version>
+    <short_description>WiiFlorked loader</short_description>
+    <ahb_access/>
+    <no_ios_reload/>
+</app>

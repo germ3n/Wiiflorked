@@ -1,0 +1,4 @@
+*.dol
+*.elf
+build/
+.DS_Store
