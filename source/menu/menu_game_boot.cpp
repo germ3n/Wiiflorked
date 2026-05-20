@@ -136,6 +136,19 @@ void CMenu::_launch(const dir_discHdr *hdr)
 			break;
 	}
 
+	for(int idx = 1; idx <= 8; idx++)
+	{
+		char usbPath[8] = {0};
+		snprintf(usbPath, sizeof(usbPath), "usb%d:", idx);
+		if (strstr(hdr->path, usbPath) != NULL)
+		{
+			currentPartition = idx;
+			currentPort = idx - 1;
+			gprintf("found matching usb device: %s, currentPartition: %d, currentPort: %d\n", usbPath, currentPartition, currentPort);
+			break;
+		}
+	}
+
 	/* Get Banner Title for Playlog */
 	if(launchHdr.type == TYPE_WII_GAME || launchHdr.type == TYPE_CHANNEL || launchHdr.type == TYPE_EMUCHANNEL)
 	{
@@ -757,35 +770,69 @@ int CMenu::_loadGameIOS(u8 gameIOS, int userIOS, const char *id, bool RealNAND_C
 	u8 slot = 0;
 
 	// check if the user wants to use a specific cios and if it's installed.
-	if(userIOS && _installed_cios.find(userIOS) != _installed_cios.end())
-		slot = userIOS;
-	else // auto find a cios base match
-	{
-		// Workaround for SpongeBobs Boating Bash
-		if(strncasecmp(id, "SBV", 3) == 0)
-		{
-			slot = _cios_base[gameIOS];// try the games'IOS 53
-			if(!slot)
-				slot = _cios_base[58];
-			if(!slot && !IsOnWiiU())
-				slot = _cios_base[38];
-		}
-		else
-			slot = _cios_base[gameIOS];
-		if(!slot)// no direct match so we get the first cios with a greater base
-		{
-			for(CIOSItr itr = _cios_base.begin(); itr != _cios_base.end(); itr++)
-			{
-				if(itr->first > gameIOS && itr->first >= 56)//compare bases
-				{
-					slot = itr->second;// set to cios slot
-					break;
-				}
-			}
-		}
-	}
+	// check if the user wants to use a specific cios and if it's installed.
+    if(userIOS && _installed_cios.find(userIOS) != _installed_cios.end())
+        slot = userIOS;
+    else // auto find a cios base match
+    {
+        // Workaround for SpongeBobs Boating Bash
+        if(strncasecmp(id, "SBV", 3) == 0)
+        {
+            slot = _cios_base[gameIOS];// try the games'IOS 53
+            if(!slot)
+                slot = _cios_base[58];
+            if(!slot && !IsOnWiiU())
+                slot = _cios_base[38];
+        }
+        else
+            slot = _cios_base[gameIOS];
+            
+        if(!slot)// no direct match so we get the first cios with a greater base
+        {
+            for(CIOSItr itr = _cios_base.begin(); itr != _cios_base.end(); itr++)
+            {
+                // ignore our v10 alternate slots during the auto-search
+                if(m_autoShiftIOS)
+                    if(itr->second >= m_otherIOSStartSlot && itr->second <= m_otherIOSStartSlot + (m_IOSShiftCount - 1))
+                        continue;
+
+                if(itr->first > gameIOS && itr->first >= 56)//compare bases
+                {
+                    slot = itr->second;// set to cios slot
+                    break;
+                }
+            }
+        }
+    }
 	if(!slot)// shouldn't happen but just in case
 		slot = mainIOS;// set to wiiflow's cios
+
+	if(m_autoShiftIOS)
+	{
+		if(currentPartition >= 2)
+		{
+			if(slot >= m_d2xIOSStartSlot && slot <= m_d2xIOSStartSlot + (m_IOSShiftCount - 1))
+			{
+				gprintf("detected d2x cIOS %d, not using sd/usb1, changing to v10 beta53-alt\n", slot);
+				int slot_idx = slot - m_d2xIOSStartSlot;
+				slot = m_otherIOSStartSlot + slot_idx;
+				gprintf("changed to cIOS %d\n", slot);
+			}
+			else
+			{
+				gprintf("not using sd/usb1, not shifting cIOS, not a d2x cIOS\n");
+			}
+		}
+		else
+		{
+			gprintf("using sd/usb1, not shifting cIOS, no need for shifting\n");
+		}
+	}
+	else if(currentPartition >= 2)
+	{
+		gprintf("not using sd/usb1, not shifting cIOS, user disabled auto-shift\n");
+	}
+
 	gprintf("cIOS slot %d chosen.\n", slot);
 
 	// now we reload to this cios slot if we need to

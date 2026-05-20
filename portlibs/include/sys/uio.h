@@ -15,11 +15,11 @@
  * Define the uio buffers used for writev, readv.
  */
 
-struct iovec
-{
-  void *iov_base;
-  size_t iov_len;
-};
+//struct iovec
+//{
+//  void *iov_base;
+//  size_t iov_len;
+//};
 
 extern ssize_t readv (int filedes, const struct iovec *vector, int count);
 extern ssize_t writev(int filedes, const struct iovec *vector, int count);

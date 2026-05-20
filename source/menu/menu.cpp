@@ -101,6 +101,8 @@ CMenu::CMenu()
 	m_source_autoboot = false;
 }
 
+extern bool g_flush_log;
+
 bool CMenu::init(bool usb_mounted)
 {
 	/* Clear Playlog to prevent wiiflow from being added to it */
@@ -144,8 +146,9 @@ bool CMenu::init(bool usb_mounted)
 		_initAsyncNetwork();
 		
 	/* Check if we want SD Gecko */
-	m_use_sd_logging = m_cfg.getBool("DEBUG", "sd_write_log", false);
+	m_use_sd_logging = true;/*m_cfg.getBool("DEBUG", "sd_write_log", false);*/
 	LogToSD_SetBuffer(m_use_sd_logging);
+	g_flush_log = m_cfg.getBool("DEBUG", "force_log_flush", true); // default to true to make debugging easier (changeme, note, razornote, fixme)
 	/* ------------------------------------------------------*/
 	
 	/* Init gamer tags now in case we need to init network on boot */
@@ -287,6 +290,11 @@ bool CMenu::init(bool usb_mounted)
 	m_pluginDataDir = m_cfg.getString("GENERAL", "dir_plugins_data", fmt("%s/plugins_data", m_dataDir.c_str()));
 	m_cartDir = m_cfg.getString("GENERAL", "dir_cart", fmt("%s/cart_disk", m_dataDir.c_str()));
 	m_snapDir = m_cfg.getString("GENERAL", "dir_snap", fmt("%s/snapshots", m_dataDir.c_str()));
+
+	m_autoShiftIOS = m_cfg.getBool("GENERAL", "auto_shift_ios", true);
+	m_d2xIOSStartSlot = m_cfg.getInt("GENERAL", "d2x_cios_start_slot", 244); // 244-253
+	m_otherIOSStartSlot = m_cfg.getInt("GENERAL", "other_cios_start_slot", 204); // 204-213
+	m_IOSShiftCount = m_cfg.getInt("GENERAL", "cios_slots", 10);
 
 	/* Create our Folder Structure */
 	fsop_MakeFolder(m_dataDir.c_str()); //D'OH!
@@ -1280,6 +1288,7 @@ void CMenu::_buildMenus(void)
 	_initConfigGameMenu();
 	_initCheatSettingsMenu(); 
 	_initCoverBanner();
+	_initCiosShift();
 	_initWBFSMenu();
 	_initCategorySettingsMenu();
 	_initHomeAndExitToMenu();
@@ -1320,6 +1329,7 @@ void CMenu::_updateText(void)
 		_textSource();
 	_textPluginSettings();
 	_textCheckboxesMenu();
+	_textCiosShift();
 }
 
 typedef struct
@@ -2432,35 +2442,39 @@ bool CMenu::_loadList(void)
 
 bool CMenu::_loadWiiList(void)
 {
-	gprintf("Adding wii list\n");
-	
-	bool updateCache = m_cfg.getBool(WII_DOMAIN, "update_cache");
-	if(updateCache)
-		cacheCovers = true;
-	m_cfg.remove(WII_DOMAIN, "update_cache");
-	for(u8 i = 0; i < 2; ++i)
-	{
-		currentPartition = m_cfg.getInt(WII_DOMAIN, "partition", USB1);
-		if(currentPartition == 8)
-			currentPartition = i;
-		else if(i == 1)
-			continue;
-			
-		if(!DeviceHandle.IsInserted(currentPartition))
-			continue;
+    gprintf("Adding wii list\n");
+    
+    bool updateCache = m_cfg.getBool(WII_DOMAIN, "update_cache");
+    if(updateCache)
+        cacheCovers = true;
+    m_cfg.remove(WII_DOMAIN, "update_cache");
+    
+    int cfg_partition = m_cfg.getInt(WII_DOMAIN, "partition", USB1);
+    
+    for(u8 idx = SD; idx <= USB8; ++idx)
+    {
+        if(cfg_partition == 8)
+            currentPartition = idx;
+        else if(idx != cfg_partition)
+            continue;
+        else
+            currentPartition = idx;
+            
+        if(!DeviceHandle.IsInserted(currentPartition))
+            continue;
 
-		DeviceHandle.OpenWBFS(currentPartition);
-		string gameDir(fmt(wii_games_dir, DeviceName[currentPartition]));
-		string cacheDir(fmt("%s/%s_wii.db", m_listCacheDir.c_str(), DeviceName[currentPartition]));
-		bool preCachedList = fsop_FileExist(cacheDir.c_str());
-		m_cacheList.CreateList(COVERFLOW_WII, gameDir, stringToVector(".wbfs|.iso", '|'), cacheDir, updateCache);
-		WBFS_Close();
-		for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-			m_gameList.push_back(*tmp_itr);
-		if(!preCachedList && fsop_FileExist(cacheDir.c_str()))
-			cacheCovers = true;
-	}
-	return true;
+        DeviceHandle.OpenWBFS(currentPartition);
+        string gameDir(fmt(wii_games_dir, DeviceName[currentPartition]));
+        string cacheDir(fmt("%s/%s_wii.db", m_listCacheDir.c_str(), DeviceName[currentPartition]));
+        bool preCachedList = fsop_FileExist(cacheDir.c_str());
+        m_cacheList.CreateList(COVERFLOW_WII, gameDir, stringToVector(".wbfs|.iso", '|'), cacheDir, updateCache);
+        WBFS_Close();
+        for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
+            m_gameList.push_back(*tmp_itr);
+        if(!preCachedList && fsop_FileExist(cacheDir.c_str()))
+            cacheCovers = true;
+    }
+    return true;
 }
 
 bool CMenu::_loadHomebrewList(const char *HB_Dir)
@@ -2485,37 +2499,41 @@ bool CMenu::_loadHomebrewList(const char *HB_Dir)
 
 bool CMenu::_loadGamecubeList()
 {
-	gprintf("Adding gamecube list\n");
+    gprintf("Adding gamecube list\n");
 
-	bool updateCache = m_cfg.getBool(GC_DOMAIN, "update_cache");
-	if(updateCache)
-		cacheCovers = true;
-	m_cfg.remove(GC_DOMAIN, "update_cache");
-	for(u8 i = 0; i < 2; ++i)
-	{
-		currentPartition = m_cfg.getInt(GC_DOMAIN, "partition", USB1);
-		if(currentPartition == 8)
-			currentPartition = i;
-		else if(i == 1)
-			continue;
-			
-		if(!DeviceHandle.IsInserted(currentPartition))
-			continue;
+    bool updateCache = m_cfg.getBool(GC_DOMAIN, "update_cache");
+    if(updateCache)
+        cacheCovers = true;
+    m_cfg.remove(GC_DOMAIN, "update_cache");
+    
+    int cfg_partition = m_cfg.getInt(GC_DOMAIN, "partition", USB1);
+    
+    for(u8 idx = SD; idx <= USB8; ++idx)
+    {
+        if(cfg_partition == 8)
+            currentPartition = idx;
+        else if(idx != cfg_partition)
+            continue;
+        else
+            currentPartition = idx;
+            
+        if(!DeviceHandle.IsInserted(currentPartition))
+            continue;
 
-		string gameDir(fmt(gc_games_dir, DeviceName[currentPartition]));
-		string cacheDir(fmt("%s/%s_gamecube.db", m_listCacheDir.c_str(), DeviceName[currentPartition]));
-		bool preCachedList = fsop_FileExist(cacheDir.c_str());
-		m_cacheList.CreateList(COVERFLOW_GAMECUBE, gameDir, stringToVector(".iso|.gcm|.ciso|root", '|'), cacheDir, updateCache);
-		for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-		{
-			if(tmp_itr->settings[0] == 1) /* disc 2 */
-				continue;// skip gc disc 2 if its still part of the cached list
-			m_gameList.push_back(*tmp_itr);
-		}
-		if(!preCachedList && fsop_FileExist(cacheDir.c_str()))
-			cacheCovers = true;
-	}
-	return true;
+        string gameDir(fmt(gc_games_dir, DeviceName[currentPartition]));
+        string cacheDir(fmt("%s/%s_gamecube.db", m_listCacheDir.c_str(), DeviceName[currentPartition]));
+        bool preCachedList = fsop_FileExist(cacheDir.c_str());
+        m_cacheList.CreateList(COVERFLOW_GAMECUBE, gameDir, stringToVector(".iso|.gcm|.ciso|root", '|'), cacheDir, updateCache);
+        for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
+        {
+            if(tmp_itr->settings[0] == 1) 
+                continue;
+            m_gameList.push_back(*tmp_itr);
+        }
+        if(!preCachedList && fsop_FileExist(cacheDir.c_str()))
+            cacheCovers = true;
+    }
+    return true;
 }
 
 bool CMenu::_loadChannelList(void)
@@ -2561,107 +2579,124 @@ bool CMenu::_loadChannelList(void)
 
 bool CMenu::_loadPluginList()
 {
-	bool updateCache = m_cfg.getBool(PLUGIN_DOMAIN, "update_cache");
-	gprintf("Adding plugins list\n");
-	bool channels_done = false;
-	for(u8 i = 0; m_plugin.PluginExist(i); ++i)
-	{
-		if(!m_plugin.GetEnabledStatus(i))
-			continue;
-		int romsPartition = m_plugin.GetRomPartition(i);
-		if(romsPartition < 0)
-			romsPartition = m_cfg.getInt(PLUGIN_DOMAIN, "partition", 0);
-		currentPartition = romsPartition;
-		if(!DeviceHandle.IsInserted(currentPartition))
-			continue;
-		strncpy(m_plugin.PluginMagicWord, fmt("%08x", m_plugin.GetPluginMagic(i)), 8);
-		const char *romDir = m_plugin.GetRomDir(i);
-		if(strstr(romDir, "scummvm.ini") == NULL)
-		{
-			if(strncasecmp(m_plugin.PluginMagicWord, HB_PMAGIC, 6) == 0)//HBRW
-			{
-				if(updateCache)
-					m_cfg.setBool(HOMEBREW_DOMAIN, "update_cache", true);
-				_loadHomebrewList(romDir);
-			}
-			else if(strncasecmp(m_plugin.PluginMagicWord, GC_PMAGIC, 8) == 0)//NGCM
-			{
-				if(updateCache)
-					m_cfg.setBool(GC_DOMAIN, "update_cache", true);
-				_loadGamecubeList();
-			}
-			else if(strncasecmp(m_plugin.PluginMagicWord, WII_PMAGIC, 8) == 0)//NWII
-			{
-				if(updateCache)
-					m_cfg.setBool(WII_DOMAIN, "update_cache", true);
-				_loadWiiList();
-			}
-			else if(!channels_done && (strncasecmp(m_plugin.PluginMagicWord, NAND_PMAGIC, 8) == 0 || strncasecmp(m_plugin.PluginMagicWord, ENAND_PMAGIC, 8) == 0))//NAND
-			{
-				channels_done = true;
-				if(updateCache)
-					m_cfg.setBool(CHANNEL_DOMAIN, "update_cache", true);
-				_loadChannelList();
-			}
-			else
-			{
-				string cachedListFile(fmt("%s/%s_%s.db", m_listCacheDir.c_str(), DeviceName[currentPartition], m_plugin.PluginMagicWord));
-				bool preCachedList = fsop_FileExist(cachedListFile.c_str());
-				
-				string romsDir(fmt("%s:/%s", DeviceName[currentPartition], romDir));
-				vector<string> FileTypes = stringToVector(m_plugin.GetFileTypes(i), '|');
-				m_cacheList.Color = m_plugin.GetCaseColor(i);
-				m_cacheList.Magic = m_plugin.GetPluginMagic(i);
-				m_cacheList.usePluginDBTitles = m_cfg.getBool(PLUGIN_DOMAIN, "database_titles", true);
-				
-				string platformName = m_platform.getString("PLUGINS", m_plugin.PluginMagicWord, "");
-				if(!platformName.empty())
-				{
-					/* check COMBINED for platform names that mean the same system just different region */
-					/* some platforms have different names per country (ex. Genesis/Megadrive) */
-					/* but we use only one platform name for both */
-					string newName = m_platform.getString("COMBINED", platformName, "");
-					if(newName.empty())
-						m_platform.remove("COMBINED", platformName);
-					else
-						platformName = newName;
-				}
-				
-				m_cacheList.CreateRomList(platformName.c_str(), romsDir, FileTypes, cachedListFile, updateCache);
-				
-				for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-					m_gameList.push_back(*tmp_itr);
-				if(updateCache || (!preCachedList && fsop_FileExist(cachedListFile.c_str())))
-					cacheCovers = true;
-			}
-		}
-		else
-		{
-			string cachedListFile(fmt("%s/%s_%s.db", m_listCacheDir.c_str(), DeviceName[currentPartition], m_plugin.PluginMagicWord));
-			bool preCachedList = fsop_FileExist(cachedListFile.c_str());
-			
-			Config scummvm;
-			if(strchr(romDir, ':') == NULL || !fsop_FileExist(romDir))
-				scummvm.load(fmt("%s/%s", m_pluginsDir.c_str(), romDir));
-			else
-				scummvm.load(romDir);
-			// should add error msg if loading scummvm fails or is not found
-			string platformName = "";
-			if(m_platform.loaded())/* convert plugin magic to platform name */
-				platformName = m_platform.getString("PLUGINS", m_plugin.PluginMagicWord);
-			m_cacheList.Color = m_plugin.GetCaseColor(i);
-			m_cacheList.Magic = m_plugin.GetPluginMagic(i);
-			m_cacheList.usePluginDBTitles = m_cfg.getBool(PLUGIN_DOMAIN, "database_titles", true);
-			m_cacheList.ParseScummvmINI(scummvm, DeviceName[currentPartition], m_pluginDataDir.c_str(), platformName.c_str(), cachedListFile, updateCache);
-			for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-				m_gameList.push_back(*tmp_itr);
-			if(updateCache || (!preCachedList && fsop_FileExist(cachedListFile.c_str())))
-				cacheCovers = true;
-			scummvm.unload();
-		}
-	}
-	m_cfg.remove(PLUGIN_DOMAIN, "update_cache");
-	return true;
+    bool updateCache = m_cfg.getBool(PLUGIN_DOMAIN, "update_cache");
+    gprintf("Adding plugins list\n");
+    bool channels_done = false;
+    
+    for(u8 i = 0; m_plugin.PluginExist(i); ++i)
+    {
+        if(!m_plugin.GetEnabledStatus(i))
+            continue;
+            
+        strncpy(m_plugin.PluginMagicWord, fmt("%08x", m_plugin.GetPluginMagic(i)), 8);
+        const char *romDir = m_plugin.GetRomDir(i);
+        
+        // --- 1. HANDLE SPECIAL "NATIVE" PLUGINS FIRST ---
+        if(strncasecmp(m_plugin.PluginMagicWord, HB_PMAGIC, 6) == 0)//HBRW
+        {
+            if(updateCache)
+                m_cfg.setBool(HOMEBREW_DOMAIN, "update_cache", true);
+			if(!(m_current_view & COVERFLOW_HOMEBREW)) // prevent duplicate homebrew lists
+            	_loadHomebrewList(romDir);
+            continue; // Move to the next plugin, native loader handles the rest
+        }
+        else if(strncasecmp(m_plugin.PluginMagicWord, GC_PMAGIC, 8) == 0)//NGCM
+        {
+            if(updateCache)
+                m_cfg.setBool(GC_DOMAIN, "update_cache", true);
+			if(!(m_current_view & COVERFLOW_GAMECUBE)) // prevent duplicate gamecube lists
+            	_loadGamecubeList();
+            continue;
+        }
+        else if(strncasecmp(m_plugin.PluginMagicWord, WII_PMAGIC, 8) == 0)//NWII
+        {
+            if(updateCache)
+                m_cfg.setBool(WII_DOMAIN, "update_cache", true);
+			if(!(m_current_view & COVERFLOW_WII)) // prevent duplicate wii lists
+            	_loadWiiList();
+            continue;
+        }
+        else if(!channels_done && (strncasecmp(m_plugin.PluginMagicWord, NAND_PMAGIC, 8) == 0 || strncasecmp(m_plugin.PluginMagicWord, ENAND_PMAGIC, 8) == 0))//NAND
+        {
+            channels_done = true;
+            if(updateCache)
+                m_cfg.setBool(CHANNEL_DOMAIN, "update_cache", true);
+			if(!(m_current_view & COVERFLOW_CHANNEL)) // prevent duplicate channel lists
+            	_loadChannelList();
+            continue;
+        }
+
+        for(u8 idx = SD; idx <= USB8; ++idx)
+        {
+            currentPartition = idx;
+                
+            if(!DeviceHandle.IsInserted(currentPartition))
+                continue;
+                
+            string romsDir(fmt("%s:/%s", DeviceName[currentPartition], romDir));
+            
+            if(!fsop_FolderExist(romsDir.c_str()) && strstr(romDir, "scummvm.ini") == NULL)
+                continue;
+            
+            if(strstr(romDir, "scummvm.ini") == NULL)
+            {
+                string cachedListFile(fmt("%s/%s_%s.db", m_listCacheDir.c_str(), DeviceName[currentPartition], m_plugin.PluginMagicWord));
+                bool preCachedList = fsop_FileExist(cachedListFile.c_str());
+                
+                vector<string> FileTypes = stringToVector(m_plugin.GetFileTypes(i), '|');
+                m_cacheList.Color = m_plugin.GetCaseColor(i);
+                m_cacheList.Magic = m_plugin.GetPluginMagic(i);
+                m_cacheList.usePluginDBTitles = m_cfg.getBool(PLUGIN_DOMAIN, "database_titles", true);
+                
+                string platformName = m_platform.getString("PLUGINS", m_plugin.PluginMagicWord, "");
+                if(!platformName.empty())
+                {
+                    string newName = m_platform.getString("COMBINED", platformName, "");
+                    if(newName.empty())
+                        m_platform.remove("COMBINED", platformName);
+                    else
+                        platformName = newName;
+                }
+                
+                m_cacheList.CreateRomList(platformName.c_str(), romsDir, FileTypes, cachedListFile, updateCache);
+                
+                for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
+                    m_gameList.push_back(*tmp_itr);
+                if(updateCache || (!preCachedList && fsop_FileExist(cachedListFile.c_str())))
+                    cacheCovers = true;
+            }
+            else
+            {
+                // ScummVM Logic
+                string cachedListFile(fmt("%s/%s_%s.db", m_listCacheDir.c_str(), DeviceName[currentPartition], m_plugin.PluginMagicWord));
+                bool preCachedList = fsop_FileExist(cachedListFile.c_str());
+                    
+                Config scummvm;
+                if(strchr(romDir, ':') == NULL || !fsop_FileExist(romDir))
+                    scummvm.load(fmt("%s/%s", m_pluginsDir.c_str(), romDir));
+                else
+                    scummvm.load(romDir);
+                    
+                string platformName = "";
+                if(m_platform.loaded())
+                    platformName = m_platform.getString("PLUGINS", m_plugin.PluginMagicWord);
+                        
+                m_cacheList.Color = m_plugin.GetCaseColor(i);
+                m_cacheList.Magic = m_plugin.GetPluginMagic(i);
+                m_cacheList.usePluginDBTitles = m_cfg.getBool(PLUGIN_DOMAIN, "database_titles", true);
+                    
+                m_cacheList.ParseScummvmINI(scummvm, DeviceName[currentPartition], m_pluginDataDir.c_str(), platformName.c_str(), cachedListFile, updateCache);
+                    
+                for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
+                    m_gameList.push_back(*tmp_itr);
+                if(updateCache || (!preCachedList && fsop_FileExist(cachedListFile.c_str())))
+                    cacheCovers = true;
+                scummvm.unload();
+            }
+        }
+    }
+    m_cfg.remove(PLUGIN_DOMAIN, "update_cache");
+    return true;
 }
 
 void CMenu::_stopSounds(void)

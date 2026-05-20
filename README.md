@@ -1,3 +1,44 @@
+# WiiFlorked: Dual-Drive Setup Guide
+
+## Step 1: The Dual-Port cIOS Foundation
+Install the required cIOS banks via the d2x cIOS Installer.
+
+Bank 1 (Port 0 / usb1):
+- cIOS: d2x v11 beta3
+- Slot 248: Base 38
+- Slot 249: Base 56
+- Slot 250: Base 57
+- Slot 251: Base 58
+
+Bank 2 (Port 1 / usb2):
+- cIOS: d2x v10 beta53-alt
+- Slot 208: Base 38
+- Slot 209: Base 56
+- Slot 210: Base 57
+- Slot 211: Base 58
+
+## Step 2: Installation
+Simply drag the wiiflorked folder into sdcard:/apps/
+
+## Step 3: Drive Layout Configuration
+- Port 0 (usb1): Place accessory-dependent games or those requiring strict timing (e.g., Driver: San Francisco, Rock Band).
+- Port 1 (usb2): Place standard Wii and GameCube backups here.
+
+
+
+
+
+Launch WiiFlorked via HBC. The cache builder merges both drives into a unified view, and the cIOS router dynamically shifts between banks based on physical drive location. Leave game settings on AUTO.
+Don't forget to 'Rebuild Cache' if you already use regular Wiiflow.
+
+
+
+This might break some things in Wiiflow, but launching Wii & Gamecube games from both usb drives works, I'll get around to plugins etc soon
+
+
+
+
+
 # WiiFlow Lite
 My mod of the Wii USB Loader WiiFlow
 

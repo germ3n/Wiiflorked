@@ -42,6 +42,8 @@ woven in by Terry Thorsen 1/2003.
 #include "unzip.h"
 #include "memory/mem2.hpp"
 
+#pragma GCC diagnostic ignored "-Wold-style-definition"
+
 #ifdef STDC
 #  include <stddef.h>
 #  include <string.h>

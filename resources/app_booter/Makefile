@@ -36,8 +36,8 @@ INCLUDES	:=
 # options for code generation
 #---------------------------------------------------------------------------------
 MACHDEP := -mno-eabi -mno-sdata -mcpu=750
-CFLAGS	:= -Wall -W -O1 -ffreestanding -std=gnu99 -Wstrict-aliasing=2 $(MACHDEP) $(INCLUDE)
-LDFLAGS	:= -nostartfiles -nostdlib $(MACHDEP) -Wl,--no-warn-rwx-segments
+CFLAGS	:= -fno-strict-aliasing -DHW_RVL -Wall -W -O1 -ffreestanding -std=gnu99 -Wstrict-aliasing=2 $(MACHDEP) $(INCLUDE)
+LDFLAGS := -Wl,-Map,$(TARGET).map -nostartfiles -nostdlib $(MACHDEP) -Wl,--no-warn-rwx-segments
 
 #---------------------------------------------------------------------------------
 # move loader to another location - THANKS CREDIAR - 0x81330000 for HBC

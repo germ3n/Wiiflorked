@@ -1,27 +1,18 @@
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-	<app version="1">
-		<name>WiiFlow WFL</name>
-		<coder>Fledge68</coder>
-		<version>5.5.4</version>
-		<release_date>20230920000000</release_date>
-		<!--   // remove this line to enable arguments
+<?xml version="1.0" encoding="UTF-8"?>
+<app version="1"> 
+    <name>WiiFlorked</name>  
+    <coder>germ3n + Fledge68</coder>  
+    <version>1.0.0+5.6.1</version>  
+    <release_date>20260520000000</release_date>  
+    <!--   // remove this line to enable arguments
 		<arguments>
 			<arg>ios=249</arg>
 			<arg>waitdir=sd:/apps/wiiflow/wait_imgs</arg>
 			<arg>waitloop</arg>
 			<arg>noflash</arg>
 		</arguments>
-		// remove this line to enable arguments -->
-		<short_description>USB Loader app</short_description>
-		<long_description>WiiFlow is a app for loading backup games from a USB Device or SD card.
-    It displays your games in a coverflow with 3D full box covers.
-    
-    Key features:
-    * Emulated NAND support
-    * Plugin system for emu apps
-    * Devolution support
-    * Nintendont support
-    * Neek2o support
-		</long_description>
-		<no_ios_reload/>
-	</app>
+		// remove this line to enable arguments -->  
+    <short_description>USB Loader app</short_description>  
+    <long_description>WiiFlorked is a mod of WiiFlow WFL that allows you to load games from two USB Devices and the SD card.</long_description>  
+    <no_ios_reload/> 
+</app>

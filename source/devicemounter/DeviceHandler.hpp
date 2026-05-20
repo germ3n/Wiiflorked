@@ -79,7 +79,7 @@ public:
 	bool MountUSBPort1();
 
 	bool SD_Inserted() { return sd.IsInserted(); }
-	bool USB_Inserted() { return usb.IsInserted(); }
+	bool USB_Inserted(int dev) { return usb[dev].IsInserted(); }
 	bool UsablePartitionMounted();
 	bool PartitionUsableForNandEmu(int Partition);
 	bool WaitForDevice(const DISC_INTERFACE *Handle);
@@ -89,12 +89,12 @@ public:
 	void UnMountAllUSB();
 
 	PartitionHandle *GetUSBHandleFromPartition(int part);
-	const DISC_INTERFACE *GetUSBInterface();
+	const DISC_INTERFACE *GetUSBInterface(int port);
 
 	int PathToDriveType(const char *path);
 	const char * GetFSName(int dev);
 	int GetFSType(int dev);
-	u16 GetUSBPartitionCount();
+	u16 GetUSBPartitionCount(int port);
 	const char *PathToFSName(const char *path) { return GetFSName(PathToDriveType(path)); }
 	wbfs_t *GetWbfsHandle(int dev);
 	s32 OpenWBFS(int dev);
@@ -104,7 +104,7 @@ private:
 	bool mount_usb;
 
 	PartitionHandle sd;
-	PartitionHandle usb;
+	PartitionHandle usb[8];
 };
 
 extern DeviceHandler DeviceHandle;

@@ -182,7 +182,7 @@ void NandSave::LoadSettings()
 		if(cur_ios > 0)
 			mainIOS = cur_ios;
 		cur_load = file->use_cios;
-		useMainIOS = cur_load;
+		//useMainIOS = cur_load;
 	}
 	if(file != NULL)
 		MEM2_free(file);

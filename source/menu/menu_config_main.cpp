@@ -2,13 +2,15 @@
 #include <algorithm>
 #include "menu.hpp"
 
-u8 mainCfg_Pages = 14;
+u8 mainCfg_Pages = 15;
 u8 mainCfg_curPage = 1;
 
 template <class T> static inline T loopNum(T i, T s)
 {
 	return (i + s) % s;
 }
+
+extern bool g_flush_log;
 
 /* page 2 stuff */
 vector<string> languages_available;
@@ -401,7 +403,7 @@ void CMenu::_showConfigMain()
 		m_btnMgr.setText(m_configLbl4, _t("cfg724", L"Lock coverflow layouts"));
 		m_btnMgr.setText(m_configBtn4, m_cfg.getBool("general", "cf_locked") ? _t("yes", L"Yes") : _t("no", L"No"));
 	}
-	else // page 14
+	else if(mainCfg_curPage == 14)// page 14
 	{
 		m_btnMgr.show(m_configBtn1);
 		m_btnMgr.show(m_configBtn2);
@@ -422,6 +424,18 @@ void CMenu::_showConfigMain()
 		i = min(max(0, m_cfg.getInt("GENERAL", "video_width", 0)), (int)ARRAY_SIZE(CMenu::_GlobalVideoWidths) - 1);
 		m_btnMgr.setText(m_configLbl4Val, _t(CMenu::_GlobalVideoWidths[i].id, CMenu::_GlobalVideoWidths[i].text));
 	}
+	else if(mainCfg_curPage == 15)
+    {
+        m_btnMgr.show(m_configBtn1);
+        m_btnMgr.show(m_configBtn2);
+        
+
+        m_btnMgr.setText(m_configLbl1, _t("cfg_debug1", L"Force Log Flush"));
+        m_btnMgr.setText(m_configBtn1, g_flush_log ? _t("on", L"On") : _t("off", L"Off"));
+
+        m_btnMgr.setText(m_configLbl2, _t("cfgshft0", L"cIOS Auto-Shift Settings"));
+        m_btnMgr.setText(m_configBtn2, _t("cfg15", L"Go"));
+    }
 }
 
 void CMenu::_configMain(void)
@@ -973,6 +987,21 @@ void CMenu::_configMain(void)
 					int val = m_cfg.getInt("GENERAL", "video_width");
 					m_btnMgr.setText(m_configLbl4Val, _t(CMenu::_GlobalVideoWidths[val].id, CMenu::_GlobalVideoWidths[val].text));
 				}
+			}
+			else if(mainCfg_curPage == 15)
+			{
+				if(m_btnMgr.selected(m_configBtn1))
+                {
+                    g_flush_log = !g_flush_log;
+                    m_cfg.setBool("DEBUG", "force_log_flush", g_flush_log);
+                    m_btnMgr.setText(m_configBtn1, g_flush_log ? _t("on", L"On") : _t("off", L"Off"));
+                }
+                else if(m_btnMgr.selected(m_configBtn2))
+                {
+                    _hideConfigMain();
+                    _CiosShift();
+                    _showConfigMain();
+                }
 			}
 		}
 	}

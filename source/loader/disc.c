@@ -3,7 +3,7 @@
 #include <string.h>
 #include <ogcsys.h>
 #include <unistd.h>
-#include <ogc/lwp_threads.h>
+#include <ogc/lwp.h>
 #include <ogc/lwp_watchdog.h>
 #include <ogc/machine/processor.h>
 
@@ -58,7 +58,7 @@ s32 Disc_Wait(void)
 		if(ret < 0)
 			return ret;
 
-		// 10 tries to make sure it doesn´t "freeze" in Install dialog
+		// 10 tries to make sure it doesn?t "freeze" in Install dialog
 		// if no Game Disc is insert
 		icounter++;
 		sleep(1);

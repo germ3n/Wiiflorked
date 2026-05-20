@@ -19,6 +19,7 @@ bool bufferMessages = true;
 
 char gprintfBuffer[GPRINTF_SIZE];
 char sdwritebuffer[SDWRITE_SIZE];
+size_t sdwritebuffer_size = 0;
 
 //static ssize_t __out_write(struct _reent *r __attribute__((unused)), int fd __attribute__((unused)), const char *ptr, size_t len)
 static ssize_t __out_write(struct _reent *r __attribute__((unused)), void *fd __attribute__((unused)), const char *ptr, size_t len)
@@ -83,24 +84,42 @@ static char ascii(char s)
 	return s;
 }
 
+bool g_flush_log = true; // always default to true to make debugging easier on startup
 static void WriteToFile(const char* tmp, size_t len)
 {
-	if(bufferMessages == false)
-		return;
+    if(bufferMessages == false || sd_inited == false)
+        return;
 
-	if((strlen(sdwritebuffer) + len) < SDWRITE_SIZE)
-		strcat(sdwritebuffer, tmp);
+    bool wrote_directly = false;
 
-	if(sd_inited == false)
-		return;
+    if((sdwritebuffer_size + len) < SDWRITE_SIZE)
+    {
+        strcat(sdwritebuffer, tmp);
+        sdwritebuffer_size += len;
+    }
+    else
+    {
+        wrote_directly = true; 
+    }
 
-	FILE *outfile = fopen("sd:/wiiflow.log", "a");
-	if(outfile)
-	{
-		fwrite(sdwritebuffer, 1, strlen(sdwritebuffer), outfile);
-		memset(sdwritebuffer, 0, SDWRITE_SIZE);
-		fclose(outfile);
-	}
+    if(!g_flush_log && !wrote_directly && sdwritebuffer_size < SDWRITE_SIZE)
+        return;
+
+    FILE *outfile = fopen("sd:/wiiflow.log", "a");
+    if(outfile)
+    {
+        if(sdwritebuffer_size > 0)
+        {
+            fwrite(sdwritebuffer, 1, sdwritebuffer_size, outfile);
+            memset(sdwritebuffer, 0, SDWRITE_SIZE);
+            sdwritebuffer_size = 0;
+        }
+
+        if(wrote_directly)
+            fwrite(tmp, 1, len, outfile);
+
+        fclose(outfile);
+    }
 }
 
 void Gecko_Init(void)

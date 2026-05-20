@@ -43,20 +43,38 @@ void *Kernel = NULL;
 
 bool Load_Neek2o_Kernel()
 {
-	bool ret = true;
-
-	if(IsOnWiiU())
-		Kernel = fsop_ReadFile("usb1:/sneek/vwiikernel.bin", &kernelSize);
-	else
-	{
-		Kernel = fsop_ReadFile("usb1:/sneek/kernel.bin", &kernelSize);
-		if(Kernel == NULL)
-			Kernel = fsop_ReadFile("sd:/sneek/kernel.bin", &kernelSize);
-	}
-	if(Kernel == NULL)
-		ret = false;
-
-	return ret;
+    if(IsOnWiiU())
+    {
+        Kernel = fsop_ReadFile("sd:/sneek/vwiikernel.bin", &kernelSize);
+        if (Kernel == NULL)
+        {
+            for(int idx = 0; idx < 8; idx++)
+            {
+				char path[64];
+				snprintf(path, sizeof(path), "usb%d:/sneek/vwiikernel.bin", idx+1);
+                Kernel = fsop_ReadFile(path, &kernelSize);
+                if (Kernel != NULL)
+                    break;
+            }
+        }
+    }
+    else
+    {
+        Kernel = fsop_ReadFile("sd:/sneek/kernel.bin", &kernelSize);
+        if (Kernel == NULL)
+        {
+            for(int idx = 0; idx < 8; idx++)
+            {
+				char path[64];
+				snprintf(path, sizeof(path), "usb%d:/sneek/kernel.bin", idx+1);
+                Kernel = fsop_ReadFile(path, &kernelSize);
+                if (Kernel != NULL)
+                    break;
+            }
+        }
+    }
+    
+    return (Kernel != NULL);
 }
 
 s32 Launch_nk(u64 TitleID, const char *nandpath, u64 ReturnTo)

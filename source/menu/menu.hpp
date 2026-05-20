@@ -1010,6 +1010,13 @@ private:
 	int _loadGameIOS(u8 ios, int userIOS, const char *id, bool RealNAND_Channels = false);
 	bool _loadFile(u8 * &buffer, u32 &size, const char *path, const char *file);// gameconfig.txt and cheats.gct
 
+	//multi-usb functions
+	void _hideCiosShift(bool instant = false);
+	void _showCiosShift(void);
+	void _CiosShift(void);
+	void _initCiosShift(void);
+	void _textCiosShift(void);
+
 //
 	struct SOption { const char id[11]; const wchar_t text[16]; };
 
@@ -1050,6 +1057,12 @@ private:
 	volatile bool m_thrdStop;
 	volatile bool m_thrdWorking;
 	volatile bool m_thrdNetwork;
+
+	// multi-usb
+	bool m_autoShiftIOS;
+	int m_d2xIOSStartSlot;
+	int m_otherIOSStartSlot;
+	int m_IOSShiftCount;
 };
 
 extern CMenu mainMenu;

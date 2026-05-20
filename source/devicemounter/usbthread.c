@@ -10,64 +10,75 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
+ * * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
-#include <ogc/cache.h>
-#include <ogc/lwp.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <time.h>
-
-#include "usbthread.h"
-#include "usbstorage.h"
-#include "gecko/gecko.hpp"
-
-lwp_t USB_Thread = LWP_THREAD_NULL;
-volatile bool CheckUSB = false;
-volatile bool idle = false;
-volatile time_t start = 0;
-u8 sector[4096];
-
-void *KeepUSBAlive(void *nothing)
-{
-	int NumberSectors = USBStorage2_GetCapacity(0, NULL);
-	start = time(NULL);
-	srand(start);
-	while(CheckUSB)
-	{
-		if(idle || (time(NULL) - start) > 19)
-		{
-			USBStorage2_ReadSectors(0, rand() % NumberSectors, 1, sector);
-			idle = true;
-		}
-		sleep(1);
-	}
-	return nothing;
-}
-
-void CreateUSBKeepAliveThread()
-{
-	CheckUSB = true;
-	LWP_CreateThread(&USB_Thread, KeepUSBAlive, NULL, NULL, 0, 40);
-}
-
-void KillUSBKeepAliveThread()
-{
-	CheckUSB = false;
-	USBKeepAliveThreadReset();
-	if(USB_Thread != LWP_THREAD_NULL)
-	{
-		LWP_JoinThread(USB_Thread, NULL);
-		USB_Thread = LWP_THREAD_NULL;
-	}
-}
-
-void USBKeepAliveThreadReset()
-{
-	while(reading)
-		usleep(100);
-	start = time(NULL);
-	idle = false;
-}
+ #include <ogc/cache.h>
+ #include <ogc/lwp.h>
+ #include <unistd.h>
+ #include <stdlib.h>
+ #include <time.h>
+ 
+ #include "usbthread.h"
+ #include "usbstorage.h"
+ #include "gecko/gecko.hpp"
+ 
+ lwp_t USB_Thread = LWP_THREAD_NULL;
+ volatile bool CheckUSB = false;
+ volatile bool idle = false;
+ volatile time_t start = 0;
+ u8 sector[4096] __attribute__((aligned(32)));
+ 
+ void *KeepUSBAlive(void *nothing)
+ {
+	 start = time(NULL);
+	 srand(start);
+	 
+	 while(CheckUSB)
+	 {
+		 if(idle || (time(NULL) - start) > 19)
+		 {
+			 // 1. Fetch capacity dynamically inside the loop in case a drive mounted late
+			 int numSectors0 = USBStorage2_GetCapacity(0, NULL);
+			 int numSectors1 = USBStorage2_GetCapacity(1, NULL);
+ 
+			 if(numSectors0 > 0)
+				 USBStorage2_ReadSectors(0, rand() % numSectors0, 1, sector);
+				 
+			 if(numSectors1 > 0)
+				 USBStorage2_ReadSectors(1, rand() % numSectors1, 1, sector);
+				 
+			 idle = true;
+			 
+			 // 2. CRITICAL: Reset the timer so it actually waits another 19 seconds!
+			 start = time(NULL); 
+		 }
+		 sleep(1);
+	 }
+	 return nothing;
+ }
+ 
+ void CreateUSBKeepAliveThread()
+ {
+	 CheckUSB = true;
+	 LWP_CreateThread(&USB_Thread, KeepUSBAlive, NULL, NULL, 0, 40);
+ }
+ 
+ void KillUSBKeepAliveThread()
+ {
+	 CheckUSB = false;
+	 USBKeepAliveThreadReset();
+	 if(USB_Thread != LWP_THREAD_NULL)
+	 {
+		 LWP_JoinThread(USB_Thread, NULL);
+		 USB_Thread = LWP_THREAD_NULL;
+	 }
+ }
+ 
+ void USBKeepAliveThreadReset()
+ {
+	 while(reading)
+		 usleep(100);
+	 start = time(NULL);
+	 idle = false;
+ }

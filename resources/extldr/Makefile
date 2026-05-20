@@ -11,8 +11,8 @@ RANLIB = $(PREFIX)ranlib
 STRIP = $(PREFIX)strip
 
 MACHDEP = -mcpu=750 -mno-eabi
-CFLAGS = $(MACHDEP) -O1 -Werror -Wall -pipe -mno-sdata
-LDFLAGS = $(MACHDEP) -n -nostartfiles -nostdlib -Wl,-T,link.ld -L.
+CFLAGS = -fno-strict-aliasing $(MACHDEP) -O1 -Werror -Wall -pipe -mno-sdata
+LDFLAGS = $(MACHDEP) -n -nostartfiles -nostdlib -Wl,-Map,$(notdir $@).map -Wl,-T,link.ld -L.
 ASFLAGS = -D_LANGUAGE_ASSEMBLY -DHW_RVL -x assembler-with-cpp
 
 TARGET_LINKED = boot.elf

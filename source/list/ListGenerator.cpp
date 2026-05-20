@@ -89,11 +89,12 @@ static void AddToList(const dir_discHdr *element)
 static void AddISO(const char *GameID, const char *GameTitle, const char *GamePath, 
 							u32 GameColor, u8 Type)
 {
+	gprintf("AddISO: GameID=%s, GameTitle=%s, GamePath=%s, GameColor=%d, Type=%d\n", GameID, GameTitle, GamePath, GameColor, Type);
+
 	memset((void*)&ListElement, 0, sizeof(dir_discHdr));
 	ListElement.index = m_cacheList.size();
 	
 	if(GameID != NULL) strncpy(ListElement.id, GameID, 6);
-	
 	if(GamePath != NULL) strncpy(ListElement.path, GamePath, sizeof(ListElement.path) - 1);
 	
 	ListElement.casecolor = CustomTitles.getColor("COVERS", ListElement.id, GameColor).intVal();
@@ -199,6 +200,7 @@ static void Add_GameCube_Game(char *FullPath)
 /* add homebrew boot.dol to the list */
 static void Add_Homebrew_Dol(char *FullPath)
 {
+	gprintf("Add_Homebrew_Dol: FullPath=%s\n", FullPath);
 	if(strcasestr(FullPath, "boot.") == NULL)
 		return;
 	memset((void*)&ListElement, 0, sizeof(dir_discHdr));
@@ -224,6 +226,7 @@ static void Add_Homebrew_Dol(char *FullPath)
 Channel *chan = NULL;
 static void Create_Channel_List()
 {
+	gprintf("Create_Channel_List\n");
 	for(u32 i = 0; i < ChannelHandle.Count(); i++)
 	{
 		chan = ChannelHandle.GetChannel(i);
@@ -265,6 +268,7 @@ static void Create_Channel_List()
 			ListElement.type = TYPE_CHANNEL;
 		else
 			ListElement.type = TYPE_EMUCHANNEL;
+		//gprintf("Create_Channel_List: ListElement.index=%d, ListElement.title=%s, ListElement.type=%d\n", ListElement.index, ListElement.title, ListElement.type);
 		m_cacheList.push_back(ListElement);
 	}
 }
@@ -273,6 +277,7 @@ static void Create_Channel_List()
 static void Add_Plugin_Game(char *FullPath)
 {
 	/* only add disc 1 of multi disc games */
+	gprintf("Add_Plugin_Game: FullPath=%s\n", FullPath);
 	const char *RomFilename = strrchr(FullPath, '/') + 1;
 
 	if (std::regex_search(std::string(FullPath), fileNameSkipRegex)) 
@@ -351,6 +356,7 @@ static void Add_Plugin_Game(char *FullPath)
 /* in scummvm.ini the path is the path without the exe or main app file added on */
 void ListGenerator::ParseScummvmINI(Config &ini, const char *Device, const char *datadir, const char *platform, const string& DBName, bool UpdateCache)
 {
+	gprintf("ParseScummvmINI: Device=%s, datadir=%s, platform=%s, DBName=%s, UpdateCache=%d\n", Device, datadir, platform, DBName.c_str(), UpdateCache);
 	Clear();
 	if(!DBName.empty())
 	{
@@ -450,6 +456,7 @@ void ListGenerator::ParseScummvmINI(Config &ini, const char *Device, const char 
 /* note: scummvm games are parsed above */
 void ListGenerator::CreateRomList(const char *platform, const string& romsDir, const vector<string>& FileTypes, const string& DBName, bool UpdateCache)
 {
+	gprintf("CreateRomList: platform=%s, romsDir=%s, DBName=%s, UpdateCache=%d\n", platform, romsDir.c_str(), DBName.c_str(), UpdateCache);
 	Clear();
 	if(!DBName.empty())
 	{
@@ -489,6 +496,7 @@ void ListGenerator::CreateRomList(const char *platform, const string& romsDir, c
 	
 void ListGenerator::CreateList(u32 Flow, const string& Path, const vector<string>& FileTypes, const string& DBName, bool UpdateCache)
 {
+	gprintf("CreateList: Flow=%d, Path=%s, DBName=%s, UpdateCache=%d\n", Flow, Path.c_str(), DBName.c_str(), UpdateCache);
 	Clear();
 	if(!DBName.empty())
 	{
@@ -554,6 +562,7 @@ DIR *pdir = NULL;
 void GetFiles(const char *Path, const vector<string>& FileTypes, 
 				FileAdder AddFile, bool CompareFolders, u32 max_depth, u32 depth)
 {
+	gprintf("GetFiles: Path=%s, max_depth=%d, depth=%d\n", Path, max_depth, depth);
 	vector<string> SubPaths;
 
 	pdir = opendir(Path);
@@ -592,6 +601,7 @@ void GetFiles(const char *Path, const vector<string>& FileTypes,
 /* create sourceflow list from current source_menu.ini */
 void ListGenerator::createSFList(u8 maxBtns, Config &m_sourceMenuCfg, const string& sourceDir)
 {
+	gprintf("createSFList: maxBtns=%d, sourceDir=%s\n", maxBtns, sourceDir.c_str());
 	Clear();
 	char btn_selected[256];	
 	for(u8 i = 0; i <= maxBtns; i++)

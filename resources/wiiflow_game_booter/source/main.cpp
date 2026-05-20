@@ -143,7 +143,7 @@ int main()
 	/* Shutdown IOS subsystems */
 	u32 level = IRQ_Disable();
 	__IOS_ShutdownSubsystems();
-	__exception_closeall();
+	//__exception_closeall();
 
 	/* Originally from tueidj - taken from NeoGamma (thx) */
 	*(vu32*)0xCC003024 = 1;

@@ -13,6 +13,8 @@
 #include "zlib.h"
 #include "ioapi.h"
 
+#pragma GCC diagnostic ignored "-Wold-style-definition"
+
 
 
 /* I've found an old Unix (a SunOS 4.1.3_U1) without all SEEK_* defined.... */

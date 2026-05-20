@@ -158,6 +158,7 @@ bool Config::load(const char *filename)
 	m_loaded = false;
 	m_filename = filename;
 	u32 n = 0;
+	(void)n;
 	if (!file.is_open()) return m_loaded;
 	m_domains.clear();
 	while (file.good())

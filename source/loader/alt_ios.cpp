@@ -68,7 +68,7 @@ bool loadIOS(int ios, bool MountDevices)
 	IOS_GetCurrentIOSInfo();
 	if(CurrentIOS.Type == IOS_TYPE_HERMES)
 		load_ehc_module_ex();
-	else if(CurrentIOS.Type == IOS_TYPE_WANIN && CurrentIOS.Revision >= 18)
+	else if((CurrentIOS.Type == IOS_TYPE_WANIN || CurrentIOS.Type == IOS_TYPE_D2X) && CurrentIOS.Revision >= 18)
 		load_dip_249();
 	DeviceHandle.SetModes();
 	if(MountDevices && ios != CurIOS)// remount sd and USB if desired

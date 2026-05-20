@@ -5,58 +5,65 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    container: devkitpro/devkitppc:20260503
     timeout-minutes: 20
+    
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache
-        id: cache-1
-        uses: actions/cache@v4
-        with:
-          path: cache
-          key: ${{ runner.os }}-cache-1
+      - name: Install Node.js for act compatibility
+        if: ${{ env.ACT == 'true' }}
+        run: |
+          apt-get update
+          apt-get install -y nodejs
+          echo ${{ env.ACT }}
 
-      - name: Download devkitPPC r42.2-1, libogc 2.4.0 and required tools
-        if: steps.cache-1.outputs.cache-hit != 'true'
-        # general-tools is needed for bin2s and gamecube-tools is needed for elf2dol
-        run: | 
-          mkdir cache && cd cache
-          wget "https://wii.leseratte10.de/devkitPro/file.php/devkitPPC-r42.2-1-linux_x86_64.pkg.tar.zst"
-          wget "https://wii.leseratte10.de/devkitPro/file.php/devkitppc-rules-1.1.1-1-any.pkg.tar.xz"
-          wget "https://wii.leseratte10.de/devkitPro/file.php/libogc-2.4.0-1-any.pkg.tar.zst"
-          wget "https://wii.leseratte10.de/devkitPro/file.php/general-tools-1.2.0-2-linux_x86_64.pkg.tar.xz"
-          wget "https://wii.leseratte10.de/devkitPro/file.php/gamecube-tools-1.0.3-1-linux_x86_64.pkg.tar.xz"
-          cd ..
-
-      - name: Extract downloaded files
-        # general-tools is needed for bin2s and gamecube-tools is needed for elf2dol
-        run: | 
-          tar -xf cache/devkitPPC-r42.2-1-linux_x86_64.pkg.tar.zst --strip-components=1
-          tar -xf cache/devkitppc-rules-1.1.1-1-any.pkg.tar.xz --strip-components=1
-          tar -xf cache/libogc-2.4.0-1-any.pkg.tar.zst --strip-components=1
-          tar -xf cache/general-tools-1.2.0-2-linux_x86_64.pkg.tar.xz --strip-components=1
-          tar -xf cache/gamecube-tools-1.0.3-1-linux_x86_64.pkg.tar.xz --strip-components=1
+      - name: Add safe directory exception for git inside the container
+        run: |
+          git config --global --add safe.directory $(pwd)
 
       - name: Compile
         run: |
-          PATH=$(pwd)/devkitpro/devkitPPC/bin:$PATH DEVKITPPC=$(pwd)/devkitpro/devkitPPC DEVKITPRO=$(pwd)/devkitpro make
+          make -j$(nproc)
 
       - name: Package
         run: |
           cp -r wii/apps apps
-          mkdir -p apps/wiiflow/
-          cp -r out/bins apps/wiiflow/bins
-          cp -r out/imgs apps/wiiflow/imgs
-          cp out/boot.dol apps/wiiflow/
+          mkdir -p apps/wiiflorked/
+          cp -r out/bins apps/wiiflorked/bins
+          cp -r out/imgs apps/wiiflorked/imgs
+          cp out/boot.dol apps/wiiflorked/
+          mv apps/wiiflow/* apps/wiiflorked/
+          rm -rf apps/wiiflow
           mkdir -p wiiflow
           cp -r wii/wiiflow/Languages wiiflow/languages
           cp -r wii/wiiflow/themes_lite wiiflow/themes_lite
+        
           echo "sha=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with: 
-          name: wiiflow_lite_${{ env.sha }}
+          name: wiiflorked_${{ env.sha }}
           path: |
             apps
             wiiflow
+
+      - name: Zip release payload
+        if: ${{ env.ACT != 'true' }}
+        run: |
+          apt-get update && apt-get install -y zip curl
+          zip -r wiiflorked_${{ env.sha }}.zip apps wiiflow
+
+      - name: Create Release
+        if: ${{ env.ACT != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The gh CLI isn't pre-installed in the devkitpro container, so we fetch the binary directly
+          curl -sSL https://github.com/cli/cli/releases/download/v2.49.0/gh_2.49.0_linux_amd64.tar.gz | tar xz -C /tmp
+          mv /tmp/gh_2.49.0_linux_amd64/bin/gh /usr/local/bin/
+          
+          gh release create build-${{ env.sha }} wiiflorked_${{ env.sha }}.zip --title "Build ${{ env.sha }}" --generate-notes

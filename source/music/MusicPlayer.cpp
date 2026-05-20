@@ -25,6 +25,9 @@
 #include "gui/text.hpp"
 #include "gecko/gecko.hpp"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
 #define	MUSIC_DEPTH 10
 Musicplayer MusicPlayer;
 
@@ -267,3 +270,5 @@ bool Musicplayer::SongChanged()
 	MusicChanged = false;
 	return true;
 }
+
+#pragma GCC diagnostic pop

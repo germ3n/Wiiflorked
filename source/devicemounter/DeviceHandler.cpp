@@ -43,13 +43,19 @@ DeviceHandler DeviceHandle;
 void DeviceHandler::Init()
 {
 	/* PartitionHandle inits */
+	gprintf("DeviceHandler::Init() - sd.Init()\n");
 	sd.Init();
-	usb.Init();
+	for(int idx = 0; idx < 8; idx++)
+	{
+		gprintf("DeviceHandler::Init() - usb[%d].Init()\n", idx);
+		usb[idx].Init();
+	}
 }
 
 void DeviceHandler::SetMountUSB(bool using_usb)
 {
 	mount_usb = using_usb;
+	gprintf("DeviceHandler::SetMountUSB() - mount_usb = %d\n", mount_usb);
 }
 
 void DeviceHandler::SetModes()
@@ -61,21 +67,31 @@ void DeviceHandler::SetModes()
 		usb_libogc_mode = 0;// use cios for USB (usbstorage.c)
 		sdhc_mode_sd = 0;// use cios for SD (sdhc.c)
 	}
+	gprintf("DeviceHandler::SetModes() - sdhc_mode_sd = %d\n", sdhc_mode_sd);
+	gprintf("DeviceHandler::SetModes() - usb_libogc_mode = %d\n", usb_libogc_mode);
 }
 
 void DeviceHandler::MountAll()
 {
+	gprintf("DeviceHandler::MountAll() - MountSD()\n");
 	MountSD();
+	gprintf("DeviceHandler::MountAll() - MountAllUSB()\n");
 	MountAllUSB();
 }
 
 bool DeviceHandler::Mount(int dev)
 {
 	if(dev == SD)
+	{
+		gprintf("DeviceHandler::Mount() - MountSD()\n");
 		return MountSD();
+	}
 
 	else if(dev >= USB1 && dev <= USB8)
+	{
+		gprintf("DeviceHandler::Mount() - MountUSB(%d)\n", dev - USB1);
 		return MountUSB(dev-USB1);
+	}
 
 	return false;
 }
@@ -84,8 +100,10 @@ bool DeviceHandler::MountSD()
 {
 	if(!sd.IsInserted() || !sd.IsMounted(0))
 	{
+		gprintf("DeviceHandler::MountSD() - !sd.IsInserted() || !sd.IsMounted(0)\n");
 		if(CurrentIOS.Type == IOS_TYPE_HERMES)
 		{	/* Slowass Hermes SDHC Module */
+			gprintf("DeviceHandler::MountSD() - CurrentIOS.Type == IOS_TYPE_HERMES\n");
 			for(int i = 0; i < 50; i++)
 			{
 				if(SDHC_Init())
@@ -93,51 +111,78 @@ bool DeviceHandler::MountSD()
 				usleep(1000);
 			}
 		}
+		gprintf("DeviceHandler::MountSD() - sd.SetDevice(&__io_sdhc)\n");
 		sd.SetDevice(&__io_sdhc);
 		//! Mount only one SD Partition
+		gprintf("DeviceHandler::MountSD() - sd.Mount(0, DeviceName[SD], true)\n");
 		return sd.Mount(0, DeviceName[SD], true); /* Force FAT, SD cards should always be FAT */
 	}
+	gprintf("DeviceHandler::MountSD() - true\n");
 	return true;
 }
 
 bool DeviceHandler::MountUSB(int pos)
 {
-	if(pos >= GetUSBPartitionCount())
+	gprintf("DeviceHandler::MountUSB() - pos >= GetUSBPartitionCount(pos)\n");
+	if(pos < 0 || pos >= 8)
+	{
+		gprintf("DeviceHandler::MountUSB() - pos < 0 || pos >= 8\n");
 		return false;
-	return usb.Mount(pos, DeviceName[USB1+pos]);
+	}
+	gprintf("DeviceHandler::MountUSB() - usb[pos].Mount(0, DeviceName[USB1+pos])\n");
+	return usb[pos].Mount(0, DeviceName[USB1+pos]); 
 }
 
 bool DeviceHandler::MountAllUSB()
 {
 	if(!mount_usb)
+	{
+		gprintf("DeviceHandler::MountAllUSB() - !mount_usb\n");
 		return false;
-		
-	/* Kill possible USB thread */
+	}
+
+	gprintf("DeviceHandler::MountAllUSB() - KillUSBKeepAliveThread()\n");
 	KillUSBKeepAliveThread();
 
-	/* usb spinup - Wait for our slowass HDD */
-	if(WaitForDevice(GetUSBInterface()) == false)
-		return false;// failed to spin up in time or no USB HDD connected
-
-	/* calls FindPartitions() to read MBR and get list of partitions from MBR */
-	if(!usb.IsInserted() || !usb.IsMounted(0))
-		usb.SetDevice(GetUSBInterface());
-
-	/* Mount partitions */
 	bool result = false;
-	int partCount = GetUSBPartitionCount();
-	for(int i = 0; i < partCount; i++)
-	{
-		if(MountUSB(i))
-			result = true;
-	}
-	// in case no partition is mounted for some strange reason, we force mount the first partition to FAT
-	if(!result)
-		result = usb.Mount(0, DeviceName[USB1], true); /* Force FAT */
 
-	/* if a partition is mounted and wiiflow is in iOS58 libogc mode then start the USBKeepAliveThread */
+	for(int idx = 0; idx < 8; idx++) 
+	{
+		gprintf("DeviceHandler::MountAllUSB() - GetUSBInterface(%d)\n", idx);
+		const DISC_INTERFACE* interface = GetUSBInterface(idx);
+		if(interface == NULL)
+		{
+			gprintf("DeviceHandler::MountAllUSB() - interface == NULL\n");
+			continue;
+		}
+
+		gprintf("DeviceHandler::MountAllUSB() - WaitForDevice(interface)\n");
+		if(WaitForDevice(interface))
+		{
+			gprintf("DeviceHandler::MountAllUSB() - usb[idx].SetDevice(interface)\n");
+			usb[idx].SetDevice(interface);
+
+			if(usb[idx].GetPartitionCount() > 0)
+			{
+				gprintf("DeviceHandler::MountAllUSB() - usb[idx].Mount(0, DeviceName[USB1 + idx])\n");
+				if(usb[idx].Mount(0, DeviceName[USB1 + idx]))
+					result = true;
+			}
+		}
+	}
+
+	if(!result)
+	{
+		gprintf("DeviceHandler::MountAllUSB() - !result\n");
+		gprintf("DeviceHandler::MountAllUSB() - usb[0].Mount(0, DeviceName[USB1], true)\n");
+		result = usb[0].Mount(0, DeviceName[USB1], true); 
+	}
+
 	if(result && usb_libogc_mode)
+	{
+		gprintf("DeviceHandler::MountAllUSB() - CreateUSBKeepAliveThread()\n");
 		CreateUSBKeepAliveThread();
+	}
 
 	return result;
 }
@@ -145,9 +190,15 @@ bool DeviceHandler::MountAllUSB()
 bool DeviceHandler::IsInserted(int dev)
 {
 	if(dev == SD)
+	{
+		gprintf("DeviceHandler::IsInserted() - sd.IsInserted() && sd.IsMounted(0)\n");	
 		return sd.IsInserted() && sd.IsMounted(0);
+	}
 	else if(dev >= USB1 && dev <= USB8)
-		return usb.IsMounted(dev-USB1);
+	{
+		gprintf("DeviceHandler::IsInserted() - usb[dev - 1].IsMounted(0)\n");
+		return usb[dev - 1].IsMounted(0);
+	}
 
 	return false;
 }
@@ -155,9 +206,15 @@ bool DeviceHandler::IsInserted(int dev)
 void DeviceHandler::UnMount(int dev)
 {
 	if(dev == SD)
+	{
+		gprintf("DeviceHandler::UnMount() - UnMountSD()\n");
 		UnMountSD();
+	}
 	else if(dev >= USB1 && dev <= USB8)
+	{
+		gprintf("DeviceHandler::UnMount() - UnMountUSB(%d)\n", dev - USB1);
 		UnMountUSB(dev-USB1);
+	}
 }
 
 void DeviceHandler::UnMountAll()
@@ -166,28 +223,42 @@ void DeviceHandler::UnMountAll()
 	KillUSBKeepAliveThread();
 
 	for(u32 i = SD; i < MAXDEVICES; i++)
+	{
+		gprintf("DeviceHandler::UnMountAll() - UnMount(%d)\n", i);
 		UnMount(i);
+	}
 	USBStorage2_Deinit();
+	gprintf("DeviceHandler::UnMountAll() - USBStorage2_Deinit()\n");
 	USB_Deinitialize();
+	gprintf("DeviceHandler::UnMountAll() - USB_Deinitialize()\n");
 	SDHC_Close();
 
 	sd.Cleanup();
-	usb.Cleanup();
+	for(int idx = 0; idx < 8; idx++)
+	{
+		gprintf("DeviceHandler::UnMountAll() - usb[%d].Cleanup()\n", idx);
+		usb[idx].Cleanup();
+	}
 }
 
-void DeviceHandler::UnMountUSB(int pos)
+void DeviceHandler::UnMountUSB(int dev)
 {
-	if(pos >= GetUSBPartitionCount())
+	if(dev < 0 || dev >= 8)
+	{
+		gprintf("DeviceHandler::UnMountUSB() - dev < 0 || dev >= 8\n");
 		return;
-	return usb.UnMount(pos);
+	}
+	// Force local partition to 0
+	usb[dev].UnMount(0);
 }
 
 void DeviceHandler::UnMountAllUSB()
 {
-	int partCount = GetUSBPartitionCount();
-
-	for(int i = 0; i < partCount; i++)
-		UnMountUSB(i);
+	for(int idx = 0; idx < 8; idx++)
+	{
+		gprintf("DeviceHandler::UnMountAllUSB() - UnMountUSB(%d)\n", idx);
+		UnMountUSB(idx);
+	}
 }
 
 int DeviceHandler::PathToDriveType(const char *path)
@@ -210,8 +281,8 @@ const char *DeviceHandler::GetFSName(int dev)
 		return sd.GetFSName(0);
 	else if(dev >= USB1 && dev <= USB8)
 	{
-		if(dev-USB1 < usb.GetPartitionCount())
-			return usb.GetFSName(dev-USB1);
+		if(usb[dev - 1].GetPartitionCount())
+			return usb[dev - 1].GetFSName(0);
 	}
 	return "";
 }
@@ -233,17 +304,25 @@ int DeviceHandler::GetFSType(int dev)
 	return -1;
 }
 
-u16 DeviceHandler::GetUSBPartitionCount()
+u16 DeviceHandler::GetUSBPartitionCount(int port)
 {
-	return usb.GetPartitionCount();
+	//return usb[port].GetPartitionCount();
+	return usb[port].GetPartitionCount() > 0 ? 1 : 0; // only one partition per port for now
 }
 
 wbfs_t * DeviceHandler::GetWbfsHandle(int dev)
 {
 	if(dev == SD)
+	{
+		gprintf("DeviceHandler::GetWbfsHandle() - sd.GetWbfsHandle(0)\n");
 		return sd.GetWbfsHandle(0);
+	}
 	else if(dev >= USB1 && dev <= USB8)
-		return usb.GetWbfsHandle(dev-USB1);
+	{
+		gprintf("DeviceHandler::GetWbfsHandle() - usb[dev - 1].GetWbfsHandle(0)\n");
+		return usb[dev - 1].GetWbfsHandle(0);
+	}
+	gprintf("DeviceHandler::GetWbfsHandle() - NULL\n");
 	return NULL;
 }
 
@@ -254,15 +333,24 @@ s32 DeviceHandler::OpenWBFS(int dev)
 	const char *partition = DeviceName[dev];
 
 	if(dev == SD && IsInserted(dev))
+	{
+		gprintf("DeviceHandler::OpenWBFS() - sd.GetLBAStart(dev)\n");
 		part_lba = sd.GetLBAStart(dev);
+	}
 	else if(dev >= USB1 && dev <= USB8 && IsInserted(dev))
 	{
+		gprintf("DeviceHandler::OpenWBFS() - usb[dev - 1].GetLBAStart(0)\n");
 		part_idx = dev;
-		part_lba = usb.GetLBAStart(dev - USB1);
+		part_lba = usb[dev - 1].GetLBAStart(0);
 	}
 	else
 		return -1;
 
+	gprintf("DeviceHandler::OpenWBFS() - WBFS_Init(GetWbfsHandle(dev), part_fs, part_idx, part_lba, partition) \n");
+	gprintf("DeviceHandler::OpenWBFS() - part_fs = %d\n", part_fs);
+	gprintf("DeviceHandler::OpenWBFS() - part_idx = %d\n", part_idx);
+	gprintf("DeviceHandler::OpenWBFS() - part_lba = %d\n", part_lba);
+	gprintf("DeviceHandler::OpenWBFS() - partition = %s\n", partition);
 	return WBFS_Init(GetWbfsHandle(dev), part_fs, part_idx, part_lba, partition);
 }
 
@@ -274,6 +362,7 @@ bool DeviceHandler::WaitForDevice(const DISC_INTERFACE *Handle)
 	time_t timeout = time(NULL);
 	while(time(NULL) - timeout < 20)
 	{
+		gprintf("DeviceHandler::WaitForDevice() - Handle->startup() && Handle->isInserted()\n");
 		if(Handle->startup() && Handle->isInserted())
 			return true;
 		usleep(50000);
@@ -299,12 +388,11 @@ bool DeviceHandler::PartitionUsableForNandEmu(int Partition)
 	return false;
 }
 
-const DISC_INTERFACE *DeviceHandler::GetUSBInterface()
+const DISC_INTERFACE __attribute__((noinline)) *DeviceHandler::GetUSBInterface(int port)
 {
-	if(((CurrentIOS.Type == IOS_TYPE_HERMES && CurrentIOS.Version > 4) ||
-			(CurrentIOS.Type == IOS_TYPE_D2X && CurrentIOS.Version > 8) ||
-			(CurrentIOS.Type == IOS_TYPE_NORMAL_IOS && CurrentIOS.Revision == 58))
-			&& currentPort == 1)
+	if (port == 0)
+		return &__io_usbstorage2_port0;
+	else if (port == 1)
 		return &__io_usbstorage2_port1;
-	return &__io_usbstorage2_port0;
+	return NULL;
 }
