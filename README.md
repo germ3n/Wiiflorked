@@ -1,7 +1,8 @@
 # WiiFlorked: A Fork of WiiFlow Lite with support for 2 external hard drives.
 
 ## Step 1: The Dual-Port cIOS Foundation
-Install the required cIOS banks via the d2x cIOS Installer.
+Install the required cIOS banks via the d2x cIOS Installer.<br>
+(d2x Installers: )[https://github.com/germ3n/Wiiflorked/raw/refs/heads/master/d2x.zip])
 
 Bank 1 (Port 0 / usb1):
 - cIOS: d2x v11 beta3
