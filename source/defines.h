@@ -1,14 +1,14 @@
 
-#define APP_NAME				"WiiFlow WFL"
-#define APP_VERSION				"5.6.1"
+#define APP_NAME				"WiiFlorked"
+#define APP_VERSION				"1.0.0+5.6.1"
 
 #define APP_DATA_DIR			"wiiflow"
-#define APPS_DIR				"apps/wiiflow"
+#define APPS_DIR				"apps/wiiflorked"
 
 #define GAMES_DIR				"%s:/wbfs"
 #define HOMEBREW_DIR			"apps"
 #define DF_GC_GAMES_DIR			"%s:/games"
-#define CFG_FILENAME			"wiiflow_lite.ini"
+#define CFG_FILENAME			"wiiflorked.ini"
 #define CAT_FILENAME			"categories_lite.ini"
 #define SOURCE_FILENAME			"source_menu.ini"
 #define CTITLES_FILENAME		"custom_titles.ini"
@@ -30,8 +30,8 @@
 #define	NAND_PMAGIC				"4E414E44"
 #define	HB_PMAGIC				"48425257"
 
-#define DEVELOPERS				"Fledge68"
-#define PAST_DEVELOPERS			"FIX94, OverjoY, Hibernatus, Narolez, Hulk, Miigotu, r-win"
+#define DEVELOPERS				"germ3n"
+#define PAST_DEVELOPERS			"Fledge68, FIX94, OverjoY, Hibernatus, Narolez, Hulk, Miigotu, r-win"
 #define LOADER_AUTHOR			"Kwiirk, Waninkoko, Hermes"
 #define GUI_AUTHOR				"Hibernatus"
 

@@ -199,7 +199,7 @@ bool CMenu::init(bool usb_mounted)
 	int wp = m_cfg.getInt(WII_DOMAIN, "partition", -1);
 	if(wp < 0)
 	{
-		if(!m_cfg.getBool("GENERAL", "sd_only"))
+		/*if(!m_cfg.getBool("GENERAL", "sd_only"))
 		{
 			for(int i = SD; i <= USB8; i++) // Find first wbfs folder or a partition of wbfs file system
 			{
@@ -216,12 +216,12 @@ bool CMenu::init(bool usb_mounted)
 				wp = 0;
 			else
 				wp = 1;
-		}
-		m_cfg.setInt(WII_DOMAIN, "partition", wp);
+		}*/
+		m_cfg.setInt(WII_DOMAIN, "partition", 8);
 	}
 	
 	/* preferred partition setting - negative 1 means not set by user so skip this */
-	int pp = m_cfg.getInt(WII_DOMAIN, "preferred_partition", -1);
+	/*int pp = m_cfg.getInt(WII_DOMAIN, "preferred_partition", -1);
 	if(pp >= 0)
 	{
 		if(usb_mounted && pp > 0)
@@ -236,7 +236,9 @@ bool CMenu::init(bool usb_mounted)
 			m_cfg.setInt(GC_DOMAIN, "partition", USB1);
 		else
 			m_cfg.setInt(GC_DOMAIN, "partition", SD);
-	}
+	}*/
+
+	m_cfg.setInt(GC_DOMAIN, "partition", 8); // 8 = scan sd, usb1 and usb2
 	
 	/* Our Wii games dir */
 	u8 partition = m_cfg.getInt(WII_DOMAIN, "partition");
