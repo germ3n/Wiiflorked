@@ -7,6 +7,7 @@
 * Only supports a single FAT32 partition per drive, which has to be the first partition
 * So far only tested on my RVL-001 with 4.1E SM
 * Banner extraction doesn't work so every Game will just play the default sound. Workaround for this is currently to extract the banner on a PC via wit. Script you can use to extract the banners: [https://gist.github.com/germ3n/6e4319f49a78b3ba83a1ae6216fe288e](https://gist.github.com/germ3n/6e4319f49a78b3ba83a1ae6216fe288e)
+* Toolchain has been updated to devkitPPC r50-1
 
 ## Step 1: The Dual-Port cIOS Foundation
 Install the required cIOS banks via the d2x cIOS Installer. [d2x Installers](https://github.com/germ3n/Wiiflorked/raw/refs/heads/master/d2x.zip)<br>
