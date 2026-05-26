@@ -14,12 +14,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
-#ifndef _LISTGENERATOR_HPP_
-#define _LISTGENERATOR_HPP_
+#ifndef __LISTGENERATOR_HPP
+#define __LISTGENERATOR_HPP
 
 #include <string>
 #include <vector>
 #include <stdio.h>
+#include <regex>
 
 #include "defines.h"
 #include "types.h"
@@ -29,33 +30,58 @@
 #include "gui/GameTDB.hpp"
 #include "plugin/plugin.hpp"
 
-#define CONFIG_FILENAME_SKIP_DOMAIN	"PLUGINS"
-#define CONFIG_FILENAME_SKIP_KEY	"filename_skip_regex"
-#define CONFIG_FILENAME_SKIP_DEFAULT	"((dis[ck]|tape|side|track)[ _-]([b-l][^a-z]|0*[2-9]|0*[1-9][0-9]))|(^disc2[.]iso$)|(^neogeo[.]zip$)|(^funboot[.]rom$)|(^(ecs|exec|grom)[.]bin$)"
+#define CONFIG_FILENAME_SKIP_DOMAIN "PLUGINS"
+#define CONFIG_FILENAME_SKIP_KEY    "filename_skip_regex"
+#define CONFIG_FILENAME_SKIP_DEFAULT    "((dis[ck]|tape|side|track)[ _-]([b-l][^a-z]|0*[2-9]|0*[1-9][0-9]))|(^disc2[.]iso$)|(^neogeo[.]zip$)|(^funboot[.]rom$)|(^(ecs|exec|grom)[.]bin$)"
 
-class ListGenerator : public std::vector<dir_discHdr>
+class ListGenerator 
 {
-public:
-	void createSFList(u8 maxBtns, Config &m_sourceMenuCfg, const string& sourceDir);
-	void Init(const char *settingsDir, const char *Language, const char *plgnsDataDir, const std::string& fileNameSkipPattern);
-	void Clear();
-	void ParseScummvmINI(Config &ini, const char *Device, const char *datadir, const char *platform, const string& DBName, bool UpdateCache);
-	void CreateRomList(const char *platform, const string& romsDir, const vector<string>& FileTypes, const string& DBName, bool UpdateCache);
-	void CreateList(u32 Flow, const string& Path, const vector<string>& FileTypes, const string& DBName, bool UpdateCache);
-	u32 Color;
-	u32 Magic;
-	bool usePluginDBTitles;
 private:
-	void OpenConfigs();
-	void CloseConfigs();
-	string gameTDB_Path;
-	string CustomTitlesPath;
-	string gameTDB_Language;
+    std::vector<dir_discHdr> m_buffer;
+
+    std::string gameTDB_Path;
+    std::string gameTDB_Language;
+    std::string CustomTitlesPath;
+
+public:
+    u32 Magic;
+    u32 Color;
+    bool usePluginDBTitles; 
+
+    ListGenerator();
+    ~ListGenerator();
+
+    void Init(const char *settingsDir, const char *Language, const char *plgnsDataDir, const std::string& fileNameSkipPattern);
+    void Clear(void);
+    void OpenConfigs();
+    void CloseConfigs();
+    
+    // Core Loaders
+    void FastLoadDB(const std::string& dbPath);
+	void FastLoadMultiDB(const std::vector<std::string>& dbPaths, std::vector<dir_discHdr>& targetList);
+    void CreateRomList(const char *platform, const string& romsDir, const std::vector<string>& FileTypes, const string& DBName, bool UpdateCache);
+    void CreateList(u32 Flow, const string& Path, const std::vector<string>& FileTypes, const string& DBName, bool UpdateCache);
+    void ParseScummvmINI(Config &ini, const char *Device, const char *datadir, const char *platform, const string& DBName, bool UpdateCache);
+    void createSFList(u8 maxBtns, Config &m_sourceMenuCfg, const string& sourceDir);
+
+    // Vector Overrides
+    void clear() { m_buffer.clear(); }
+    void reserve(u32 size) { m_buffer.reserve(size); }
+    void push_back(const dir_discHdr& item) { m_buffer.push_back(item); }
+    bool empty() const { return m_buffer.empty(); }
+    size_t size() const { return m_buffer.size(); }
+
+    dir_discHdr& operator[](u32 idx) { return m_buffer[idx]; }
+
+    // Native Iterators for menu.cpp (Search and Sort)
+    std::vector<dir_discHdr>::iterator begin() { return m_buffer.begin(); }
+    std::vector<dir_discHdr>::iterator end() { return m_buffer.end(); }
 };
 
 typedef void (*FileAdder)(char *Path);
 void GetFiles(const char *Path, const std::vector<string>& FileTypes, 
-			FileAdder AddFile, bool CompareFolders, u32 max_depth = 2, u32 depth = 1);
+            FileAdder AddFile, bool CompareFolders, u32 max_depth = 2, u32 depth = 1);
+
 extern ListGenerator m_cacheList;
 
-#endif /*_LISTGENERATOR_HPP_*/
+#endif

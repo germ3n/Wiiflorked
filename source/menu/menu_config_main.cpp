@@ -428,13 +428,16 @@ void CMenu::_showConfigMain()
     {
         m_btnMgr.show(m_configBtn1);
         m_btnMgr.show(m_configBtn2);
-        
+        m_btnMgr.show(m_configBtn3);
 
         m_btnMgr.setText(m_configLbl1, _t("cfg_debug1", L"Force Log Flush"));
         m_btnMgr.setText(m_configBtn1, g_flush_log ? _t("on", L"On") : _t("off", L"Off"));
 
         m_btnMgr.setText(m_configLbl2, _t("cfgshft0", L"cIOS Auto-Shift Settings"));
         m_btnMgr.setText(m_configBtn2, _t("cfg15", L"Go"));
+
+		m_btnMgr.setText(m_configLbl3, _t("cfg_status", L"Show Status Menu"));
+        m_btnMgr.setText(m_configBtn3, _t("cfg_toggle", L"Toggle"));
     }
 }
 
@@ -1001,6 +1004,10 @@ void CMenu::_configMain(void)
                     _hideConfigMain();
                     _CiosShift();
                     _showConfigMain();
+                }
+				else if(m_btnMgr.selected(m_configBtn3))
+                {
+                    _toggleStatusMenu();
                 }
 			}
 		}

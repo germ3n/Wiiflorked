@@ -42,6 +42,8 @@ void Sys_ExitTo(int);
 int Sys_GetExitTo(void);
 void Sys_SetNeekPath(const char*);
 
+void Sys_SetCustomExitTitle(u64 title_id);
+
 void Open_Inputs(void);
 void Close_Inputs(void);
 

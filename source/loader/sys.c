@@ -95,6 +95,12 @@ void Sys_ExitTo(int option)
 	DCFlushRange((void*)Priiloader_CFG2, 4);
 }
 
+u64 CustomExitTitleID = 0;
+void Sys_SetCustomExitTitle(u64 title_id)
+{
+    CustomExitTitleID = title_id;
+}
+
 void Sys_Exit(void)
 {
 	/* Shutdown Inputs */
@@ -112,8 +118,14 @@ void Sys_Exit(void)
 	{
 		/* We wanna to boot something */
 		WII_Initialize();
+		if(CustomExitTitleID != 0) 
+        {
+			 gprintf("Sys_Exit::CustomExitTitleID=%d\n", CustomExitTitleID);
+             int result = WII_LaunchTitle(CustomExitTitleID);
+			 gprintf("Sys_Exit::result=%d\n", result);
+        }
 		/* if in neek2o mode Launch_nk will just return to neek2o system menu and not launch anything */
-		if(ExitOption == EXIT_TO_WFNK2O)
+		else if(ExitOption == EXIT_TO_WFNK2O)
 			Launch_nk(0x1000157464C41LL, NeekPath, 0);// 57464C41 = WFLA : 44574641 = DWFA
 		else if(ExitOption == EXIT_TO_SMNK2O)
 			Launch_nk(0, NeekPath, 0);

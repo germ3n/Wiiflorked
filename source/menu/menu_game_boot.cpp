@@ -2,6 +2,8 @@
 #include <fcntl.h>
 #include <ogc/machine/processor.h>
 #include <ogc/lwp_watchdog.h>
+#include "../loader/sys.h"
+#include <ogc/system.h>
 
 #include "menu.hpp"
 #include "types.h"
@@ -289,40 +291,68 @@ void CMenu::_launchPlugin(dir_discHdr *hdr)
 	_launchHomebrew(plugin_file, arguments);
 }
 
+void fceuxtx_hacks(u64 target_title_id);
+
 void CMenu::_launchHomebrew(const char *filepath, vector<string> arguments)
 {
-	/* clear coverflow, start wiiflow wait animation, set exit handler */	
-	_launchShutdown();
-	m_gcfg1.save(true);
-	m_gcfg2.save(true);
-	m_cat.save(true);
-	m_cfg.save(true);
+    _launchShutdown();
+    m_gcfg1.save(true);
+    m_gcfg2.save(true);
+    m_cat.save(true);
+    m_cfg.save(true);
 
-	Playlog_Delete();
+    Playlog_Delete();
 
-	/* load boot.dol into memory and load app_booter.bin into memory */
-	bool ret = (LoadHomebrew(filepath) && LoadAppBooter(fmt("%s/app_booter.bin", m_binsDir.c_str())));
-	if(ret == false)
-	{
-		_error(_t("errgame14", L"app_booter.bin not found!"));
-		return;
-	}
-	/* no more error msgs - remove btns and sounds */
-	cleanup(); 
+    bool ret = (LoadHomebrew(filepath) && LoadAppBooter(fmt("%s/app_booter.bin", m_binsDir.c_str())));
+    if(ret == false)
+    {
+        _error(_t("errgame14", L"app_booter.bin not found!"));
+        return;
+    }
 
-	AddBootArgument(filepath);
-	for(u32 i = 0; i < arguments.size(); ++i)
-	{
-		gprintf("app argument: %s\n", arguments[i].c_str());
-		AddBootArgument(arguments[i].c_str());
-	}
+    cleanup(); 
 
-	ShutdownBeforeExit();// before launching homebrew or plugin dol
-	NandHandle.Patch_AHB();
-	IOS_ReloadIOS(58);
-	WII_Initialize();
-	BootHomebrew();
-	Sys_Exit();
+    AddBootArgument(filepath);
+    for(u32 idx = 0; idx < arguments.size(); ++idx)
+    {
+        gprintf("app argument: %s\n", arguments[idx].c_str());
+        AddBootArgument(arguments[idx].c_str());
+    }
+
+    string retTo = m_cfg.getString("GENERAL", "returnto", "HBC");
+    u64 target_title_id = 0x000100014A4F4449ULL; 
+    if (retTo.length() == 4) {
+        target_title_id = 0x0001000100000000ULL | 
+                          ((u64)(u8)retTo[0] << 24) | 
+                          ((u64)(u8)retTo[1] << 16) | 
+                          ((u64)(u8)retTo[2] << 8)  | 
+                          ((u64)(u8)retTo[3]);
+    }
+
+    if(strstr(filepath, "fceuxtx"))
+        fceuxtx_hacks(target_title_id);
+
+    // Set the exit title BEFORE booting, so app_booter.bin can configure its return stub.
+    Sys_SetCustomExitTitle(target_title_id);
+
+    ShutdownBeforeExit();
+    NandHandle.Patch_AHB();
+    IOS_ReloadIOS(58);
+    WII_Initialize();
+    
+    // This is a one-way trip. The app_booter takes over the system here.
+    BootHomebrew();
+    
+    // This code only runs if BootHomebrew entirely fails to execute the payload.
+    Sys_Exit();
+}
+
+void fceuxtx_hacks(u64 target_title_id)
+{
+    u64 *id_storage = (u64*)0x8000180C;
+    *id_storage = target_title_id;
+    
+    DCFlushRange((void*)0x8000180C, 32);
 }
 
 vector<string> CMenu::_getMetaXML(const char *bootpath)

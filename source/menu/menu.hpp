@@ -36,6 +36,28 @@ using std::string;
 using std::vector;
 using std::min;
 
+struct StatusLog {
+    mutex_t mutex; // Changed from lwp_mutex_t
+    std::vector<std::string> msgs;
+
+    StatusLog() { LWP_MutexInit(&mutex, false); }
+    ~StatusLog() { LWP_MutexDestroy(mutex); }
+
+    void Add(const char* msg) {
+        LWP_MutexLock(mutex);
+        if(msgs.size() >= 5) msgs.erase(msgs.begin());
+        msgs.push_back(std::string(msg));
+        LWP_MutexUnlock(mutex);
+    }
+
+    std::vector<std::string> Get() {
+        LWP_MutexLock(mutex);
+        std::vector<std::string> copy = msgs;
+        LWP_MutexUnlock(mutex);
+        return copy;
+    }
+};
+
 class CMenu
 {
 public: // functions called from outside CMenu
@@ -1063,6 +1085,21 @@ private:
 	int m_d2xIOSStartSlot;
 	int m_otherIOSStartSlot;
 	int m_IOSShiftCount;
+
+	// splashscreen text
+    s16 m_statusLbl[5];
+	s16 m_statusShadow[5];
+	bool m_statusVisible;
+    void _initStatusMenu(void);
+    void _drawStatusMenu(void);
+    void _hideStatusMenu(bool instant);
+    void _showStatusMenu(void);
+	void _toggleStatusMenu(void);
+
+	//unified view
+	TexData m_allGamesLogo;
+public:
+	StatusLog m_status;
 };
 
 extern CMenu mainMenu;

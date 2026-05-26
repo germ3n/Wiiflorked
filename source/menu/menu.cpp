@@ -298,6 +298,13 @@ bool CMenu::init(bool usb_mounted)
 	m_otherIOSStartSlot = m_cfg.getInt("GENERAL", "other_cios_start_slot", 204); // 204-213
 	m_IOSShiftCount = m_cfg.getInt("GENERAL", "cios_slots", 10);
 
+	m_statusVisible = m_cfg.getBool("GENERAL", "debug_status_text", false);
+
+	if (m_statusVisible)
+		_showStatusMenu();
+	else
+		_hideStatusMenu(true);
+
 	/* Create our Folder Structure */
 	fsop_MakeFolder(m_dataDir.c_str()); //D'OH!
 
@@ -394,6 +401,10 @@ bool CMenu::init(bool usb_mounted)
 					enabledMagics = magics[i];
 				else
 					enabledMagics.append(',' + magics[i]);
+			}
+			else
+			{
+				gprintf("DEBUG: Plugin %s magic not found! Removing from config.\n", magics[i].c_str());
 			}
 		}
 		m_cfg.setString(PLUGIN_DOMAIN, "enabled_plugins", enabledMagics);
@@ -1300,6 +1311,7 @@ void CMenu::_buildMenus(void)
 	_initSourceMenu();
 	_initPluginSettingsMenu();
 	_initCheckboxesMenu();
+	_initStatusMenu();
 
 	_loadCFCfg();
 }
@@ -1332,6 +1344,7 @@ void CMenu::_updateText(void)
 	_textPluginSettings();
 	_textCheckboxesMenu();
 	_textCiosShift();
+	//_textStatusMenu();
 }
 
 typedef struct
@@ -1707,17 +1720,18 @@ void CMenu::_mainLoopCommon(bool withCF, bool adjusting)
 	if(m_thrdWorking)
 	{
 		musicPaused = true;
-		MusicPlayer.Pause();//note - bg music is paused but sound thread is still running. so banner gamesound still plays
+		MusicPlayer.Pause();
 		m_btnMgr.tick();
 		m_vid.prepare();
-		m_vid.setup2DProjection(false, true);// false = prepare() already set view port, true = no scaling - draw at 640x480
+		m_vid.setup2DProjection(false, true);
 		_updateBg();
 		if(CoverFlow.getRenderTex())
 			CoverFlow.RenderTex();
-		m_vid.setup2DProjection();// this time set the view port and allow scaling
+		m_vid.setup2DProjection();
 		_drawBg();
 		m_btnMgr.draw();
 		m_vid.render();
+		_drawStatusMenu();
 		return;
 	}
 	if(musicPaused && !m_thrdWorking)
@@ -1726,17 +1740,15 @@ void CMenu::_mainLoopCommon(bool withCF, bool adjusting)
 		MusicPlayer.Resume();
 	}
 	
-	/* ticks - for moving and scaling covers and gui buttons and text */
 	if(withCF)
 		CoverFlow.tick();
+
 	m_btnMgr.tick();
 	m_fa.tick();
 
-	/* video setup */
 	m_vid.prepare();
 	m_vid.setup2DProjection(false, true);
 	
-	/* background and coverflow drawing */
 	_updateBg();
 	if(CoverFlow.getRenderTex())
 		CoverFlow.RenderTex();
@@ -1745,9 +1757,9 @@ void CMenu::_mainLoopCommon(bool withCF, bool adjusting)
 	if(withCF && m_aa > 0)
 	{
 		m_vid.setAA(m_aa, true);
-		for(int i = 0; i < m_aa; ++i)
+		for(int idx = 0; idx < m_aa; ++idx)
 		{
-			m_vid.prepareAAPass(i);
+			m_vid.prepareAAPass(idx);
 			m_vid.setup2DProjection(false, true);
 			_drawBg();
 			CoverFlow.draw();
@@ -1755,7 +1767,7 @@ void CMenu::_mainLoopCommon(bool withCF, bool adjusting)
 			CoverFlow.drawEffect();
 			if(!m_soundThrdBusy && !m_banner.GetSelectedGame() && !m_snapshot_loaded)
 				CoverFlow.drawText(adjusting);
-			m_vid.renderAAPass(i);
+			m_vid.renderAAPass(idx);
 		}
 		m_vid.setup2DProjection();
 		m_vid.drawAAScene();
@@ -1774,7 +1786,6 @@ void CMenu::_mainLoopCommon(bool withCF, bool adjusting)
 		}
 	}
 	
-	/* game video or banner drawing */
 	if(m_gameSelected)
 	{
 		if(m_fa.isLoaded())
@@ -1789,27 +1800,48 @@ void CMenu::_mainLoopCommon(bool withCF, bool adjusting)
 		}
 		else if(m_banner.GetSelectedGame() && (!m_banner.GetInGameSettings() || (m_banner.GetInGameSettings() && m_bnr_settings)))
 		{
-			if(!m_soundThrdBusy)// banner loaded
+			if(!m_soundThrdBusy)
 				m_banner.Draw();
-			else if(m_banner.GetZoomSetting())// banner not loaded but in full zoom mode
-				DrawRectangle(0.0f, 0.0f, m_vid.width(), m_vid.height(), (GXColor) {0, 0, 0, 0xFF});// to prevent coverflow from showing
+			else if(m_banner.GetZoomSetting())
+				DrawRectangle(0.0f, 0.0f, m_vid.width(), m_vid.height(), (GXColor) {0, 0, 0, 0xFF});
 		}
 	}
 	
-	/* gui buttons and text drawing */
 	m_btnMgr.draw();
-	
-	/* reading controller inputs and drawing cursor pointers*/	
 	ScanInput();
-	
-	/* check if we want screensaver and if its idle long enuff, if so draw full screen black square with mild alpha */
+
+	if(wBtn_Pressed(WPAD_BUTTON_2, 0)) 
+    {
+        _showWaitMessage();
+        
+        if(m_current_view == COVERFLOW_ALL)
+        {
+            m_current_view = COVERFLOW_WII;
+            _setBg(theme.bg, m_mainBgLQ);
+        }
+        else
+        {
+            m_current_view = COVERFLOW_ALL;
+            _setBg(theme.bg, m_mainBgLQ);
+            
+            TexHandle.Cleanup(m_allGamesLogo);
+            TexHandle.fromImageFile(m_allGamesLogo, "sd:/wiiflow/logos/ALLGAMES.png");
+            m_btnMgr.setTexture(m_mainBtnPlugin, m_allGamesLogo);
+        }
+            
+        _loadList();
+        _initCF();
+        
+        _hideWaitMessage();
+    }
+
 	if(!m_cfg.getBool("GENERAL", "screensaver_disabled", true))
 		m_vid.screensaver(NoInputTime(), m_cfg.getInt("GENERAL", "screensaver_idle_seconds", 60));
 
-	/* render everything on screen */
 	m_vid.render();
+
+	_drawStatusMenu();
 	
-	// check if power button is pressed and exit wiiflow
 	if(Sys_Exiting())
 	{
 		if(m_cfg.getBool("GENERAL", "idle_standby", false))
@@ -1818,38 +1850,24 @@ void CMenu::_mainLoopCommon(bool withCF, bool adjusting)
 			exitHandler(SHUTDOWN_STANDBY);
 	}
 
-	// check if we need to start playing the game/banner sound
-	// m_gameSelected means we are on the game selected menu
-	// m_gamesound_changed means a new game sound is loaded and ready to play
-	// the previous game sound needs to stop before playing new sound
-	// and the bg music volume needs to be 0 before playing game sound
 	if(!m_soundThrdBusy && withCF && m_gameSelected && m_gamesound_changed && !m_gameSound.IsPlaying() && MusicPlayer.GetVolume() == 0)
 	{
-		_stopGameSoundThread();// stop game sound loading thread
-		m_gameSound.Play(m_bnrSndVol);// play game sound
+		_stopGameSoundThread();
+		m_gameSound.Play(m_bnrSndVol);
 		m_gamesound_changed = false;
 	}
-	// stop game/banner sound from playing if we exited game selected menu or if we move to new game
 	else if((!m_soundThrdBusy && withCF && m_gameSelected && m_gamesound_changed && m_gameSound.IsPlaying()) || (!m_gameSelected && m_gameSound.IsPlaying()))
 		m_gameSound.Stop();
 
-	/* decrease music volume to zero if any of these are true:
-		trailer video playing or||
-		game/banner sound is being loaded because we are switching to a new game or||
-		game/banner sound is loaded and ready to play or||
-		gamesound hasn't finished - when finishes music volume back to normal - some gamesounds don't loop continuously
-		also this switches to next song if current song is done */
 	MusicPlayer.Tick((withCF && (m_video_playing || (m_gameSelected && m_soundThrdBusy) || 
 						(m_gameSelected && m_gamesound_changed))) ||  m_gameSound.IsPlaying());
 
-	// set song title and display it if music info is allowed
 	if(MusicPlayer.SongChanged() && m_music_info)
 	{
 		m_btnMgr.setText(m_mainLblCurMusic, MusicPlayer.GetFileName());
 		m_btnMgr.show(m_mainLblCurMusic);
 		MusicPlayer.DisplayTime = time(NULL);
 	}
-	// hide song title if it's displaying and been >3 seconds
 	else if(MusicPlayer.DisplayTime > 0 && time(NULL) - MusicPlayer.DisplayTime > 3)
 	{
 		MusicPlayer.DisplayTime = 0;
@@ -1857,7 +1875,6 @@ void CMenu::_mainLoopCommon(bool withCF, bool adjusting)
 		if(MusicPlayer.OneSong) m_music_info = false;
 	}
 
-	//Take Screenshot
 	if(WBTN_Z_PRESSED || GBTN_Z_PRESSED)
 	{
 		time_t rawtime;
@@ -1875,8 +1892,8 @@ void CMenu::_mainLoopCommon(bool withCF, bool adjusting)
 
 	if(show_mem)
 	{
-		m_btnMgr.setText(m_mem1FreeSize, wfmt(L"Mem1 lo Free:%u, Mem1 Free:%u", MEM1_lo_freesize(), MEM1_freesize()), true);// true = dont wrap text
-		m_btnMgr.setText(m_mem2FreeSize, wfmt(L"Mem2 Free:%u", MEM2_freesize()), true);// true = dont wrap text
+		m_btnMgr.setText(m_mem1FreeSize, wfmt(L"Mem1 lo Free:%u, Mem1 Free:%u", MEM1_lo_freesize(), MEM1_freesize()), true);
+		m_btnMgr.setText(m_mem2FreeSize, wfmt(L"Mem2 Free:%u", MEM2_freesize()), true);
 	}
 
 #ifdef SHOWMEMGECKO
@@ -2402,7 +2419,7 @@ void CMenu::_initCF(void)
 
 bool CMenu::_loadList(void)
 {
-	CoverFlow.clear();// clears filtered list (m_items), cover list (m_covers), and cover textures and stops coverloader
+	CoverFlow.clear();
 	m_gameList.clear();
 	vector<dir_discHdr>().swap(m_gameList);
 	NANDemuView = false;
@@ -2420,26 +2437,34 @@ bool CMenu::_loadList(void)
 		}
 		return true;
 	}
+
 	gprintf("Creating Gamelist\n");
-	if(m_current_view & COVERFLOW_PLUGIN)
+
+	if(m_current_view == COVERFLOW_ALL || (m_current_view & COVERFLOW_PLUGIN))
 		_loadPluginList();
 		
-	if(m_current_view & COVERFLOW_WII)
+	if(m_current_view == COVERFLOW_ALL || (m_current_view & COVERFLOW_WII))
 		_loadWiiList();
 
-	if(m_current_view & COVERFLOW_CHANNEL)
+	if(m_current_view == COVERFLOW_ALL || (m_current_view & COVERFLOW_CHANNEL))
 		_loadChannelList();
 
-	if(m_current_view & COVERFLOW_GAMECUBE)
+	if(m_current_view == COVERFLOW_ALL || (m_current_view & COVERFLOW_GAMECUBE))
 		_loadGamecubeList();
 
-	if(m_current_view & COVERFLOW_HOMEBREW)
+	if(m_current_view == COVERFLOW_ALL || (m_current_view & COVERFLOW_HOMEBREW))
 		_loadHomebrewList(HOMEBREW_DIR);
+
+	if(m_current_view == COVERFLOW_ALL)
+	{
+		memset(m_plugin.PluginMagicWord, 0, 9);
+		snprintf(m_plugin.PluginMagicWord, 9, "ALLGAMES");
+	}
 
 	m_cacheList.Clear();
 
-	gprintf("Games found: %i\n", m_gameList.size());
-	return m_gameList.size() > 0 ? true : false;
+	gprintf("Games found: %d\n", m_gameList.size());
+	return m_gameList.size() > 0;
 }
 
 bool CMenu::_loadWiiList(void)
@@ -2582,55 +2607,59 @@ bool CMenu::_loadChannelList(void)
 bool CMenu::_loadPluginList()
 {
     bool updateCache = m_cfg.getBool(PLUGIN_DOMAIN, "update_cache");
-    gprintf("Adding plugins list\n");
+    gprintf("CMenu::_loadPluginList() - Adding plugins list\n");
     bool channels_done = false;
     
-    for(u8 i = 0; m_plugin.PluginExist(i); ++i)
+    std::vector<std::string> combinedDBPaths;
+    
+    for(u8 idx = 0; m_plugin.PluginExist(idx); ++idx)
     {
-        if(!m_plugin.GetEnabledStatus(i))
+        if(!m_plugin.GetEnabledStatus(idx))
             continue;
             
-        strncpy(m_plugin.PluginMagicWord, fmt("%08x", m_plugin.GetPluginMagic(i)), 8);
-        const char *romDir = m_plugin.GetRomDir(i);
+        strncpy(m_plugin.PluginMagicWord, fmt("%08x", m_plugin.GetPluginMagic(idx)), 8);
+        const char *romDir = m_plugin.GetRomDir(idx);
+        
+        gprintf("CMenu::_loadPluginList() - Processing plugin magic: %s\n", m_plugin.PluginMagicWord);
         
         // --- 1. HANDLE SPECIAL "NATIVE" PLUGINS FIRST ---
-        if(strncasecmp(m_plugin.PluginMagicWord, HB_PMAGIC, 6) == 0)//HBRW
+        if(strncasecmp(m_plugin.PluginMagicWord, HB_PMAGIC, 6) == 0)
         {
             if(updateCache)
                 m_cfg.setBool(HOMEBREW_DOMAIN, "update_cache", true);
-			if(!(m_current_view & COVERFLOW_HOMEBREW)) // prevent duplicate homebrew lists
-            	_loadHomebrewList(romDir);
-            continue; // Move to the next plugin, native loader handles the rest
+            if(!(m_current_view & COVERFLOW_HOMEBREW))
+                _loadHomebrewList(romDir);
+            continue;
         }
-        else if(strncasecmp(m_plugin.PluginMagicWord, GC_PMAGIC, 8) == 0)//NGCM
+        else if(strncasecmp(m_plugin.PluginMagicWord, GC_PMAGIC, 8) == 0)
         {
             if(updateCache)
                 m_cfg.setBool(GC_DOMAIN, "update_cache", true);
-			if(!(m_current_view & COVERFLOW_GAMECUBE)) // prevent duplicate gamecube lists
-            	_loadGamecubeList();
+            if(!(m_current_view & COVERFLOW_GAMECUBE))
+                _loadGamecubeList();
             continue;
         }
-        else if(strncasecmp(m_plugin.PluginMagicWord, WII_PMAGIC, 8) == 0)//NWII
+        else if(strncasecmp(m_plugin.PluginMagicWord, WII_PMAGIC, 8) == 0)
         {
             if(updateCache)
                 m_cfg.setBool(WII_DOMAIN, "update_cache", true);
-			if(!(m_current_view & COVERFLOW_WII)) // prevent duplicate wii lists
-            	_loadWiiList();
+            if(!(m_current_view & COVERFLOW_WII))
+                _loadWiiList();
             continue;
         }
-        else if(!channels_done && (strncasecmp(m_plugin.PluginMagicWord, NAND_PMAGIC, 8) == 0 || strncasecmp(m_plugin.PluginMagicWord, ENAND_PMAGIC, 8) == 0))//NAND
+        else if(!channels_done && (strncasecmp(m_plugin.PluginMagicWord, NAND_PMAGIC, 8) == 0 || strncasecmp(m_plugin.PluginMagicWord, ENAND_PMAGIC, 8) == 0))
         {
             channels_done = true;
             if(updateCache)
                 m_cfg.setBool(CHANNEL_DOMAIN, "update_cache", true);
-			if(!(m_current_view & COVERFLOW_CHANNEL)) // prevent duplicate channel lists
-            	_loadChannelList();
+            if(!(m_current_view & COVERFLOW_CHANNEL))
+                _loadChannelList();
             continue;
         }
 
-        for(u8 idx = SD; idx <= USB8; ++idx)
+        for(u8 part_idx = SD; part_idx <= USB8; ++part_idx)
         {
-            currentPartition = idx;
+            currentPartition = part_idx;
                 
             if(!DeviceHandle.IsInserted(currentPartition))
                 continue;
@@ -2640,63 +2669,74 @@ bool CMenu::_loadPluginList()
             if(!fsop_FolderExist(romsDir.c_str()) && strstr(romDir, "scummvm.ini") == NULL)
                 continue;
             
-            if(strstr(romDir, "scummvm.ini") == NULL)
+            string cachedListFile(fmt("%s/%s_%s.db", m_listCacheDir.c_str(), DeviceName[currentPartition], m_plugin.PluginMagicWord));
+            bool preCachedList = fsop_FileExist(cachedListFile.c_str());
+            
+            if(updateCache || !preCachedList)
             {
-                string cachedListFile(fmt("%s/%s_%s.db", m_listCacheDir.c_str(), DeviceName[currentPartition], m_plugin.PluginMagicWord));
-                bool preCachedList = fsop_FileExist(cachedListFile.c_str());
-                
-                vector<string> FileTypes = stringToVector(m_plugin.GetFileTypes(i), '|');
-                m_cacheList.Color = m_plugin.GetCaseColor(i);
-                m_cacheList.Magic = m_plugin.GetPluginMagic(i);
-                m_cacheList.usePluginDBTitles = m_cfg.getBool(PLUGIN_DOMAIN, "database_titles", true);
-                
-                string platformName = m_platform.getString("PLUGINS", m_plugin.PluginMagicWord, "");
-                if(!platformName.empty())
+                gprintf("CMenu::_loadPluginList() - Cache missing/updating for %s, scanning dir...\n", cachedListFile.c_str());
+                if(strstr(romDir, "scummvm.ini") == NULL)
                 {
-                    string newName = m_platform.getString("COMBINED", platformName, "");
-                    if(newName.empty())
-                        m_platform.remove("COMBINED", platformName);
-                    else
-                        platformName = newName;
-                }
-                
-                m_cacheList.CreateRomList(platformName.c_str(), romsDir, FileTypes, cachedListFile, updateCache);
-                
-                for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-                    m_gameList.push_back(*tmp_itr);
-                if(updateCache || (!preCachedList && fsop_FileExist(cachedListFile.c_str())))
+                    vector<string> FileTypes = stringToVector(m_plugin.GetFileTypes(idx), '|');
+                    m_cacheList.Color = m_plugin.GetCaseColor(idx);
+                    m_cacheList.Magic = m_plugin.GetPluginMagic(idx);
+                    m_cacheList.usePluginDBTitles = m_cfg.getBool(PLUGIN_DOMAIN, "database_titles", true);
+                    
+                    string platformName = m_platform.getString("PLUGINS", m_plugin.PluginMagicWord, "");
+                    if(!platformName.empty())
+                    {
+                        string newName = m_platform.getString("COMBINED", platformName, "");
+                        if(newName.empty())
+                            m_platform.remove("COMBINED", platformName);
+                        else
+                            platformName = newName;
+                    }
+                    
+                    m_cacheList.CreateRomList(platformName.c_str(), romsDir, FileTypes, cachedListFile, updateCache);
+                    for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
+                        m_gameList.push_back(*tmp_itr);
+                    
                     cacheCovers = true;
+                }
+                else
+                {
+                    Config scummvm;
+                    if(strchr(romDir, ':') == NULL || !fsop_FileExist(romDir))
+                        scummvm.load(fmt("%s/%s", m_pluginsDir.c_str(), romDir));
+                    else
+                        scummvm.load(romDir);
+                        
+                    string platformName = "";
+                    if(m_platform.loaded())
+                        platformName = m_platform.getString("PLUGINS", m_plugin.PluginMagicWord);
+                            
+                    m_cacheList.Color = m_plugin.GetCaseColor(idx);
+                    m_cacheList.Magic = m_plugin.GetPluginMagic(idx);
+                    m_cacheList.usePluginDBTitles = m_cfg.getBool(PLUGIN_DOMAIN, "database_titles", true);
+                        
+                    m_cacheList.ParseScummvmINI(scummvm, DeviceName[currentPartition], m_pluginDataDir.c_str(), platformName.c_str(), cachedListFile, updateCache);
+                        
+                    for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
+                        m_gameList.push_back(*tmp_itr);
+                    
+                    cacheCovers = true;
+                    scummvm.unload();
+                }
             }
             else
             {
-                // ScummVM Logic
-                string cachedListFile(fmt("%s/%s_%s.db", m_listCacheDir.c_str(), DeviceName[currentPartition], m_plugin.PluginMagicWord));
-                bool preCachedList = fsop_FileExist(cachedListFile.c_str());
-                    
-                Config scummvm;
-                if(strchr(romDir, ':') == NULL || !fsop_FileExist(romDir))
-                    scummvm.load(fmt("%s/%s", m_pluginsDir.c_str(), romDir));
-                else
-                    scummvm.load(romDir);
-                    
-                string platformName = "";
-                if(m_platform.loaded())
-                    platformName = m_platform.getString("PLUGINS", m_plugin.PluginMagicWord);
-                        
-                m_cacheList.Color = m_plugin.GetCaseColor(i);
-                m_cacheList.Magic = m_plugin.GetPluginMagic(i);
-                m_cacheList.usePluginDBTitles = m_cfg.getBool(PLUGIN_DOMAIN, "database_titles", true);
-                    
-                m_cacheList.ParseScummvmINI(scummvm, DeviceName[currentPartition], m_pluginDataDir.c_str(), platformName.c_str(), cachedListFile, updateCache);
-                    
-                for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-                    m_gameList.push_back(*tmp_itr);
-                if(updateCache || (!preCachedList && fsop_FileExist(cachedListFile.c_str())))
-                    cacheCovers = true;
-                scummvm.unload();
+                gprintf("CMenu::_loadPluginList() - Found existing cache: %s\n", cachedListFile.c_str());
+                combinedDBPaths.push_back(cachedListFile);
             }
         }
     }
+    
+    if(!combinedDBPaths.empty())
+    {
+        gprintf("CMenu::_loadPluginList() - Passing %d databases to FastLoadMultiDB\n", combinedDBPaths.size());
+        m_cacheList.FastLoadMultiDB(combinedDBPaths, m_gameList);
+    }
+
     m_cfg.remove(PLUGIN_DOMAIN, "update_cache");
     return true;
 }
@@ -2849,6 +2889,10 @@ const char *CMenu::_domainFromView()
 {
 	if(m_sourceflow)
 		return SOURCEFLOW_DOMAIN;
+		
+	if(m_current_view == COVERFLOW_ALL)
+		return "GENERAL"; 
+
 	switch(m_current_view)
 	{
 		case COVERFLOW_CHANNEL:

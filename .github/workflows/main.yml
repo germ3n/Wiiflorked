@@ -1,6 +1,19 @@
 name: Build binaries
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release_mode:
+        description: 'Release Mode'
+        required: true
+        default: 'draft'
+        type: choice
+        options:
+        - draft
+        - prerelease
+        - full
 
 jobs:
   build:
@@ -62,8 +75,25 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # The gh CLI isn't pre-installed in the devkitpro container, so we fetch the binary directly
+          # set -x
+          
           curl -sSL https://github.com/cli/cli/releases/download/v2.49.0/gh_2.49.0_linux_amd64.tar.gz | tar xz -C /tmp
           mv /tmp/gh_2.49.0_linux_amd64/bin/gh /usr/local/bin/
           
-          gh release create build-${{ env.sha }} wiiflorked_${{ env.sha }}.zip --title "Build ${{ env.sha }}" --generate-notes
+          FLAGS=""
+          
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ inputs.release_mode }}" = "draft" ]; then
+              FLAGS="--draft"
+            elif [ "${{ inputs.release_mode }}" = "prerelease" ]; then
+              FLAGS="--prerelease"
+            fi
+          fi
+
+          if gh release view build-${{ env.sha }} >/dev/null 2>&1; then
+            echo "Release build-${{ env.sha }} already exists. Editing..."
+            gh release edit build-${{ env.sha }} $FLAGS
+          else
+            echo "Creating new release..."
+            gh release create build-${{ env.sha }} wiiflorked_${{ env.sha }}.zip --title "Build ${{ env.sha }}" --generate-notes $FLAGS
+          fi
